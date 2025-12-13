@@ -144,6 +144,84 @@ def test_enqueue_video_yuy2_invalid_shape():
     player.close()
 
 
+def test_enqueue_video_rgba():
+    """enqueue_video_rgba で RGBA フレームをエンキューできることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    height = 240
+    width = 320
+
+    # RGBA: (H, W, 4)
+    rgba_data = np.zeros((height, width, 4), dtype=np.uint8)
+
+    player.enqueue_video_rgba(rgba_data, pts_us=0)
+
+    stats = player.stats()
+    assert stats["video_queue_size"] == 1
+    assert stats["total_frames_enqueued"] == 1
+
+    player.close()
+
+
+def test_enqueue_video_rgba_invalid_shape():
+    """enqueue_video_rgba に不正な shape を渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    height = 240
+    width = 320
+
+    # 不正な shape: (H, W, 3) は RGBA として無効（4 チャンネル必要）
+    invalid_data = np.zeros((height, width, 3), dtype=np.uint8)
+
+    with pytest.raises(Exception):
+        player.enqueue_video_rgba(invalid_data, pts_us=0)
+
+    player.close()
+
+
+def test_enqueue_video_bgra():
+    """enqueue_video_bgra で BGRA フレームをエンキューできることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    height = 240
+    width = 320
+
+    # BGRA: (H, W, 4)
+    bgra_data = np.zeros((height, width, 4), dtype=np.uint8)
+
+    player.enqueue_video_bgra(bgra_data, pts_us=0)
+
+    stats = player.stats()
+    assert stats["video_queue_size"] == 1
+    assert stats["total_frames_enqueued"] == 1
+
+    player.close()
+
+
+def test_enqueue_video_bgra_invalid_shape():
+    """enqueue_video_bgra に不正な shape を渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    height = 240
+    width = 320
+
+    # 不正な shape: (H, W, 3) は BGRA として無効（4 チャンネル必要）
+    invalid_data = np.zeros((height, width, 3), dtype=np.uint8)
+
+    with pytest.raises(Exception):
+        player.enqueue_video_bgra(invalid_data, pts_us=0)
+
+    player.close()
+
+
 def test_enqueue_video_i420_invalid_shape():
     """enqueue_video_i420 に不正な shape を渡すとエラーになることを確認"""
     import raw_player

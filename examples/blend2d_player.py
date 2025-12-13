@@ -214,7 +214,7 @@ def generate_frame(
 
         # 情報表示（左上）
         ctx.set_fill_style_rgba(255, 255, 255, 200)
-        codec_text = f"{codec_type} -> I420" if codec_type else "RAW I420"
+        codec_text = f"{codec_type} -> I420" if codec_type else "RAW BGRA"
         info_text = f"{width}x{height} | {target_fps} FPS | {codec_text}"
         ctx.fill_utf8_text(30, 50, font_small, info_text)
 
@@ -300,7 +300,7 @@ def main():
 
     total_frames = int(args.duration * fps)
 
-    mode_str = "with webcodecs-py" if args.video_codec_type else "raw (no codec)"
+    mode_str = "with webcodecs-py" if args.video_codec_type else "BGRA direct"
     print(f"Blend2D アニメーションテスト ({mode_str})")
     print(f"SDL Version: {get_version()}")
     print(f"GPU Driver: {get_gpu_driver()}")
@@ -394,7 +394,7 @@ def main():
         print(f"Encoder: {args.video_codec_type} ({codec_string})")
         print(f"Bitrate: {args.video_bitrate} kbps")
     else:
-        print("Mode: Direct rendering (no encode/decode)")
+        print("Mode: BGRA direct (no conversion, no encode/decode)")
     print("ESC または q キーで終了...")
     print()
 
@@ -502,28 +502,22 @@ def main():
                     decoded_frame.close()
                     rendered_frames += 1
             else:
-                # 直接レンダリング（エンコードなし）
-                convert_start = time.perf_counter()
-                video_frame = bgra_to_i420(bgra, width, height, pts_us)
-                y_plane, u_plane, v_plane = video_frame.planes()
-                convert_time = time.perf_counter() - convert_start
-                convert_times.append(convert_time)
-                raw_frame_sizes.append(y_plane.nbytes + u_plane.nbytes + v_plane.nbytes)
+                # 直接レンダリング（BGRA をそのまま使用）
+                raw_frame_sizes.append(bgra.nbytes)
 
-                # enqueue
-                player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us)
-                video_frame.close()
+                # enqueue（変換なし）
+                player.enqueue_video_bgra(bgra, pts_us)
                 rendered_frames += 1
 
             frame_number += 1
 
             if frame_number % fps == 0:
                 avg_generate = sum(generate_times[-60:]) / min(60, len(generate_times))
-                avg_convert = sum(convert_times[-60:]) / min(60, len(convert_times))
                 total_elapsed = time.perf_counter() - start_time
                 actual_fps = frame_number / total_elapsed
                 stats = player.stats()
                 if encoder and decoder:
+                    avg_convert = sum(convert_times[-60:]) / min(60, len(convert_times))
                     avg_encode = sum(encode_times[-60:]) / min(60, len(encode_times))
                     avg_decode = sum(decode_times[-60:]) / min(60, len(decode_times))
                     print(
@@ -541,7 +535,6 @@ def main():
                         f"Frame {frame_number}/{total_frames}: "
                         f"FPS={actual_fps:.1f}, "
                         f"gen={avg_generate * 1000:.1f}ms, "
-                        f"conv={avg_convert * 1000:.1f}ms, "
                         f"queue={stats['video_queue_size']}, "
                         f"drop={stats['dropped_frames']}"
                     )
@@ -589,7 +582,7 @@ def main():
             print(
                 f"平均生成時間: {sum(generate_times) / len(generate_times) * 1000:.2f}ms"
             )
-        if convert_times:
+        if encoder and decoder and convert_times:
             print(
                 f"平均変換時間: {sum(convert_times) / len(convert_times) * 1000:.2f}ms"
             )
@@ -606,7 +599,8 @@ def main():
         print()
         if raw_frame_sizes:
             avg_raw = sum(raw_frame_sizes) / len(raw_frame_sizes)
-            print(f"平均生データサイズ (I420): {avg_raw / 1024:.2f} KB")
+            format_name = "I420" if encoder and decoder else "BGRA"
+            print(f"平均生データサイズ ({format_name}): {avg_raw / 1024:.2f} KB")
         if encoder and decoder:
             if encoded_frame_sizes:
                 avg_encoded = sum(encoded_frame_sizes) / len(encoded_frame_sizes)

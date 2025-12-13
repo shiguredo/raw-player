@@ -68,6 +68,14 @@ void VideoPlayer::create_texture(int width, int height, VideoFormat format) {
     case VideoFormat::YUY2:
       sdl_format = SDL_PIXELFORMAT_YUY2;
       break;
+    case VideoFormat::RGBA:
+      sdl_format = SDL_PIXELFORMAT_RGBA8888;
+      break;
+    case VideoFormat::BGRA:
+      // BGRA はメモリ上 B, G, R, A の順
+      // リトルエンディアンでは SDL_PIXELFORMAT_ARGB8888 が対応
+      sdl_format = SDL_PIXELFORMAT_ARGB8888;
+      break;
   }
 
   texture_ = SDL_CreateTexture(renderer_, sdl_format,
@@ -188,6 +196,70 @@ void VideoPlayer::enqueue_video_yuy2(
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::YUY2;
+
+  // パックドデータをコピー
+  frame.y_data.resize(data.nbytes());
+  std::memcpy(frame.y_data.data(), data.data(), data.nbytes());
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  // フレームサイズを記録
+  last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
+  total_frames_enqueued_++;
+  video_queue_.push_back(std::move(frame));
+}
+
+void VideoPlayer::enqueue_video_rgba(
+    nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> data,
+    int64_t pts_us) {
+  // 次元を検証: (H, W, 4)
+  if (data.ndim() != 3) {
+    throw std::invalid_argument("RGBA data must be 3D (H, W, 4)");
+  }
+  int h = static_cast<int>(data.shape(0));
+  int w = static_cast<int>(data.shape(1));
+  int channels = static_cast<int>(data.shape(2));
+
+  if (channels != 4) {
+    throw std::invalid_argument("RGBA data must have 4 channels");
+  }
+
+  VideoFrame frame;
+  frame.pts_us = pts_us;
+  frame.width = w;
+  frame.height = h;
+  frame.format = VideoFormat::RGBA;
+
+  // パックドデータをコピー
+  frame.y_data.resize(data.nbytes());
+  std::memcpy(frame.y_data.data(), data.data(), data.nbytes());
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  // フレームサイズを記録
+  last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
+  total_frames_enqueued_++;
+  video_queue_.push_back(std::move(frame));
+}
+
+void VideoPlayer::enqueue_video_bgra(
+    nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> data,
+    int64_t pts_us) {
+  // 次元を検証: (H, W, 4)
+  if (data.ndim() != 3) {
+    throw std::invalid_argument("BGRA data must be 3D (H, W, 4)");
+  }
+  int h = static_cast<int>(data.shape(0));
+  int w = static_cast<int>(data.shape(1));
+  int channels = static_cast<int>(data.shape(2));
+
+  if (channels != 4) {
+    throw std::invalid_argument("BGRA data must have 4 channels");
+  }
+
+  VideoFrame frame;
+  frame.pts_us = pts_us;
+  frame.width = w;
+  frame.height = h;
+  frame.format = VideoFormat::BGRA;
 
   // パックドデータをコピー
   frame.y_data.resize(data.nbytes());
@@ -337,12 +409,28 @@ void VideoPlayer::render_frame_internal(const VideoFrame& frame) {
       throw std::runtime_error(std::string("Failed to update NV12 texture: ") +
                                SDL_GetError());
     }
-  } else {
+  } else if (frame.format == VideoFormat::YUY2) {
     // YUY2: パックドフォーマット、pitch は width * 2
     int pitch = frame.width * 2;
 
     if (!SDL_UpdateTexture(texture_, nullptr, frame.y_data.data(), pitch)) {
       throw std::runtime_error(std::string("Failed to update YUY2 texture: ") +
+                               SDL_GetError());
+    }
+  } else if (frame.format == VideoFormat::RGBA) {
+    // RGBA: パックドフォーマット、pitch は width * 4
+    int pitch = frame.width * 4;
+
+    if (!SDL_UpdateTexture(texture_, nullptr, frame.y_data.data(), pitch)) {
+      throw std::runtime_error(std::string("Failed to update RGBA texture: ") +
+                               SDL_GetError());
+    }
+  } else {
+    // BGRA: パックドフォーマット、pitch は width * 4
+    int pitch = frame.width * 4;
+
+    if (!SDL_UpdateTexture(texture_, nullptr, frame.y_data.data(), pitch)) {
+      throw std::runtime_error(std::string("Failed to update BGRA texture: ") +
                                SDL_GetError());
     }
   }
@@ -726,6 +814,24 @@ void init_video_player(nb::module_& m) {
            "Enqueue a YUY2 video frame.\n\n"
            "Args:\n"
            "    data: Packed YUY2 data, uint8 (H, W*2)\n"
+           "    pts_us: Presentation timestamp in microseconds")
+
+      .def("enqueue_video_rgba", &VideoPlayer::enqueue_video_rgba,
+           nb::arg("data"), nb::arg("pts_us"),
+           nb::sig("def enqueue_video_rgba(self, data: numpy.ndarray, "
+                   "pts_us: int) -> None"),
+           "Enqueue an RGBA video frame.\n\n"
+           "Args:\n"
+           "    data: RGBA data, uint8 (H, W, 4)\n"
+           "    pts_us: Presentation timestamp in microseconds")
+
+      .def("enqueue_video_bgra", &VideoPlayer::enqueue_video_bgra,
+           nb::arg("data"), nb::arg("pts_us"),
+           nb::sig("def enqueue_video_bgra(self, data: numpy.ndarray, "
+                   "pts_us: int) -> None"),
+           "Enqueue a BGRA video frame.\n\n"
+           "Args:\n"
+           "    data: BGRA data, uint8 (H, W, 4)\n"
            "    pts_us: Presentation timestamp in microseconds")
 
       .def("enqueue_audio", &VideoPlayer::enqueue_audio, nb::arg("pcm"),

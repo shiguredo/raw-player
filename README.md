@@ -23,7 +23,7 @@ Please read <https://github.com/shiguredo/oss/blob/master/README.en.md> before u
 
 [numpy.ndarray](https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html) 形式で渡された生の映像・音声データを再生する Python ライブラリです。
 
-PCM / I420 / NV12 / YUY2 データを PTS (Presentation Timestamp) に基づいて音声と映像を同期しながら再生します。
+PCM / I420 / NV12 / YUY2 / RGBA / BGRA データを PTS (Presentation Timestamp) に基づいて音声と映像を同期しながら再生します。
 
 
 https://github.com/user-attachments/assets/cdbb5b95-dbb7-4088-a842-0c66830e2a25
@@ -34,7 +34,7 @@ https://github.com/user-attachments/assets/cdbb5b95-dbb7-4088-a842-0c66830e2a25
 - 生の音声/映像入力データをそのまま再生できる
 - 入力データに numpy.ndarray を採用
 - 音声フォーマットは PCM (int16 / float32) に対応
-- 映像フォーマットは I420 (YUV420P) / NV12 / YUY2 に対応
+- 映像フォーマットは I420 (YUV420P) / NV12 / YUY2 / RGBA / BGRA に対応
 - PTS ベース音声をマスタークロックとした映像同期機能
 - GPU レンダリング
   - macOS: Metal
@@ -159,6 +159,50 @@ while player.is_open:
 player.close()
 ```
 
+### RGBA 再生
+
+```python
+import numpy as np
+import raw_player as rp
+
+player = rp.VideoPlayer(width=1920, height=1080, title="RGBA Player")
+
+# RGBA: (H, W, 4)
+rgba_data = np.zeros((1080, 1920, 4), dtype=np.uint8)
+
+# PTS（マイクロ秒）を指定してキューに追加
+player.enqueue_video_rgba(rgba_data, pts_us=0)
+player.play()
+
+while player.is_open:
+    if not player.poll_events():
+        break
+
+player.close()
+```
+
+### BGRA 再生
+
+```python
+import numpy as np
+import raw_player as rp
+
+player = rp.VideoPlayer(width=1920, height=1080, title="BGRA Player")
+
+# BGRA: (H, W, 4)
+bgra_data = np.zeros((1080, 1920, 4), dtype=np.uint8)
+
+# PTS（マイクロ秒）を指定してキューに追加
+player.enqueue_video_bgra(bgra_data, pts_us=0)
+player.play()
+
+while player.is_open:
+    if not player.poll_events():
+        break
+
+player.close()
+```
+
 ### PTS ベースの AV 同期再生
 
 ```python
@@ -183,90 +227,6 @@ while player.is_open:
     # poll_events() が音声 PTS に基づいて適切なフレームを自動描画
 
 player.close()
-```
-
-## フォーマット変換
-
-I420 / NV12 フォーマットへの変換には [webcodecs-py](https://github.com/shiguredo/webcodecs-py) を使用する。
-
-### BGRA から I420 への変換
-
-```python
-import numpy as np
-from webcodecs import VideoFrame, VideoPixelFormat
-
-def bgra_to_i420(
-    bgra: np.ndarray,
-    width: int,
-    height: int,
-    timestamp_us: int = 0,
-) -> VideoFrame:
-    """
-    BGRA (H, W, 4) を I420 形式の VideoFrame に変換する。
-
-    Args:
-        bgra: BGRA 画像データ
-        width: 画像幅
-        height: 画像高さ
-        timestamp_us: タイムスタンプ（マイクロ秒）
-
-    Returns:
-        I420 形式の VideoFrame
-    """
-    # BGRA で VideoFrame を作成
-    bgra_frame = VideoFrame(
-        bgra.flatten(),
-        {
-            "format": VideoPixelFormat.BGRA,
-            "coded_width": width,
-            "coded_height": height,
-            "timestamp": timestamp_us,
-        },
-    )
-
-    # I420 用のバッファを確保
-    i420_size = bgra_frame.allocation_size({"format": VideoPixelFormat.I420})
-    i420_data = np.zeros(i420_size, dtype=np.uint8)
-
-    # I420 フォーマットでコピー
-    bgra_frame.copy_to(i420_data, {"format": VideoPixelFormat.I420})
-    bgra_frame.close()
-
-    # VideoFrame を I420 で作成
-    return VideoFrame(
-        i420_data,
-        {
-            "format": VideoPixelFormat.I420,
-            "coded_width": width,
-            "coded_height": height,
-            "timestamp": timestamp_us,
-        },
-    )
-```
-
-### VideoFrame から Y, U, V プレーンを取得
-
-```python
-# I420 VideoFrame から各プレーンを取得
-video_frame = bgra_to_i420(bgra_data, width, height, pts_us)
-y_plane, u_plane, v_plane = video_frame.planes()
-
-# raw-player に enqueue
-player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us)
-video_frame.close()
-```
-
-### NV12 VideoFrame から Y, UV プレーンを取得
-
-```python
-# デコーダから NV12 形式で出力された場合
-# NV12: Y プレーン (plane 0) + UV インターリーブ (plane 1)
-y_plane = decoded_frame.plane(0)
-uv_plane = decoded_frame.plane(1)
-
-# raw-player に enqueue
-player.enqueue_video_nv12(y_plane, uv_plane, decoded_frame.timestamp)
-decoded_frame.close()
 ```
 
 ## API リファレンス
@@ -313,6 +273,8 @@ player = VideoPlayer(width=960, height=540, title="Raw Player")
 | `enqueue_video_i420(y, u, v, pts_us)` | I420 フレームをキューに追加 |
 | `enqueue_video_nv12(y, uv, pts_us)` | NV12 フレームをキューに追加 |
 | `enqueue_video_yuy2(data, pts_us)` | YUY2 フレームをキューに追加 |
+| `enqueue_video_rgba(data, pts_us)` | RGBA フレームをキューに追加 |
+| `enqueue_video_bgra(data, pts_us)` | BGRA フレームをキューに追加 |
 | `enqueue_audio(pcm, pts_us, sample_rate)` | 音声データをキューに追加 |
 | `play()` | 再生開始 |
 | `pause()` | 一時停止 |
@@ -349,6 +311,16 @@ player = VideoPlayer(width=960, height=540, title="Raw Player")
 
 - `data`: YUY2 パックドデータ（uint8、shape: `(H, W*2)`）
   - `Y0 U0 Y1 V0 Y2 U1 Y3 V1 ...` の形式（2 ピクセルで 4 バイト）
+- `pts_us`: PTS（マイクロ秒）
+
+#### enqueue_video_rgba の引数
+
+- `data`: RGBA データ（uint8、shape: `(H, W, 4)`）
+- `pts_us`: PTS（マイクロ秒）
+
+#### enqueue_video_bgra の引数
+
+- `data`: BGRA データ（uint8、shape: `(H, W, 4)`）
 - `pts_us`: PTS（マイクロ秒）
 
 #### stats() の戻り値
