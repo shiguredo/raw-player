@@ -41,7 +41,7 @@ build-dir = "_build/{wheel_tag}"
 verbose = false
 
 [tool.scikit-build.cmake]
-version = ">=4.1"
+version = ">=4.2"
 args = ["-DCMAKE_BUILD_TYPE=Release"]
 
 [tool.scikit-build.ninja]
