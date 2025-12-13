@@ -38,13 +38,13 @@ NUM_WAVES = 5
 
 def bgra_to_i420(bgra: np.ndarray, width: int, height: int, timestamp_us: int = 0):
     """
-    BGRA (H, W, 4) を I420 形式に変換（VideoFrame.copy_to を使用）
+    BGRA (H, W, 4) を I420 形式に変換(VideoFrame.copy_to を使用)
 
     Args:
         bgra: BGRA 画像データ
         width: 画像幅
         height: 画像高さ
-        timestamp_us: タイムスタンプ（マイクロ秒）
+        timestamp_us: タイムスタンプ(マイクロ秒)
 
     戻り値:
         I420 形式の VideoFrame
@@ -119,13 +119,13 @@ def generate_frame(
     戻り値:
         BGRA numpy 配列 (H, W, 4)
     """
-    t = frame_number / target_fps  # 経過時間（秒）
+    t = frame_number / target_fps  # 経過時間(秒)
 
     with Context(img) as ctx:
         # 合成モードを設定
         ctx.set_comp_op(CompOp.SRC_COPY)
 
-        # 背景色を時間で変化させる（暗めのグラデーション）
+        # 背景色を時間で変化させる(暗めのグラデーション)
         bg_hue = (t * 20) % 360
         bg_r, bg_g, bg_b = hsv_to_rgb(bg_hue, 0.3, 0.15)
         ctx.set_fill_style_rgba(bg_r, bg_g, bg_b, 255)
@@ -140,11 +140,11 @@ def generate_frame(
             wave_speed = 2.0 + wave_idx * 0.3
             wave_y_base = height * 0.3 + wave_idx * 80
 
-            # ウェーブの色（虹色サイクル）
+            # ウェーブの色(虹色サイクル)
             wave_hue = (t * 60 + wave_idx * 50) % 360
             wr, wg, wb = hsv_to_rgb(wave_hue, 0.8, 0.9)
 
-            # ウェーブを描画（複数の円で構成）
+            # ウェーブを描画(複数の円で構成)
             for x in range(0, width, 20):
                 y = wave_y_base + wave_amplitude * math.sin(
                     wave_freq * x + t * wave_speed + wave_offset
@@ -155,7 +155,7 @@ def generate_frame(
 
         # バウンドするボールを描画
         for ball_idx in range(NUM_BALLS):
-            # 各ボールの位置を計算（リサージュ曲線風）
+            # 各ボールの位置を計算(リサージュ曲線風)
             freq_x = 0.5 + ball_idx * 0.15
             freq_y = 0.7 + ball_idx * 0.12
             phase_x = ball_idx * math.pi / 4
@@ -167,13 +167,13 @@ def generate_frame(
             # ボールの大きさを脈動させる
             ball_radius = 30 + 15 * math.sin(t * 4 + ball_idx)
 
-            # ボールの色（虹色）
+            # ボールの色(虹色)
             ball_hue = (ball_idx * 45 + t * 100) % 360
             br, bg, bb = hsv_to_rgb(ball_hue, 1.0, 1.0)
             ctx.set_fill_style_rgba(br, bg, bb, 200)
             ctx.fill_circle(ball_x, ball_y, ball_radius)
 
-            # 光沢効果（小さい白い円）
+            # 光沢効果(小さい白い円)
             ctx.set_fill_style_rgba(255, 255, 255, 100)
             ctx.fill_circle(
                 ball_x - ball_radius * 0.3,
@@ -181,7 +181,7 @@ def generate_frame(
                 ball_radius * 0.3,
             )
 
-        # 回転する多角形パターン（中央）
+        # 回転する多角形パターン(中央)
         center_x = width * 0.5
         center_y = height * 0.5
         num_shapes = 6
@@ -199,7 +199,7 @@ def generate_frame(
             ctx.set_fill_style_rgba(sr, sg, sb, 180)
             ctx.fill_circle(shape_x, shape_y, size)
 
-        # 経過時間をミリ秒で大きく表示（白、影付き）
+        # 経過時間をミリ秒で大きく表示(白、影付き)
         elapsed_ms = int(t * 1000)
         time_text = f"{elapsed_ms:08d} ms"
         text_x = width * 0.5 - 200
@@ -212,18 +212,18 @@ def generate_frame(
         ctx.set_fill_style_rgba(255, 255, 255, 255)
         ctx.fill_utf8_text(text_x, text_y, font_large, time_text)
 
-        # 情報表示（左上）
+        # 情報表示(左上)
         ctx.set_fill_style_rgba(255, 255, 255, 200)
         codec_text = f"{codec_type} -> I420" if codec_type else "RAW BGRA"
         info_text = f"{width}x{height} | {target_fps} FPS | {codec_text}"
         ctx.fill_utf8_text(30, 50, font_small, info_text)
 
-        # フレーム番号（左上）
+        # フレーム番号(左上)
         ctx.set_fill_style_rgba(200, 200, 200, 255)
         frame_text = f"Frame: {frame_number:06d}"
         ctx.fill_utf8_text(30, 95, font_small, frame_text)
 
-        # 実際の FPS（左上、緑）
+        # 実際の FPS(左上、緑)
         ctx.set_fill_style_rgba(150, 255, 150, 255)
         fps_text = f"FPS: {actual_fps:.1f}"
         ctx.fill_utf8_text(30, 140, font_small, fps_text)
@@ -238,7 +238,7 @@ def main():
         "--duration",
         type=float,
         default=10.0,
-        help="再生時間（秒）。デフォルト: 10.0",
+        help="再生時間(秒)。デフォルト: 10.0",
     )
     parser.add_argument(
         "--fps",
@@ -273,9 +273,9 @@ def main():
         width, height = map(int, args.resolution.split("x"))
         if width <= 0 or height <= 0:
             raise ValueError
-        # 2の倍数でなければ警告（I420形式の制約）
+        # 2の倍数でなければ警告(I420形式の制約)
         if width % 2 != 0 or height % 2 != 0:
-            print(f"警告: 解像度は2の倍数を推奨します（現在: {width}x{height}）")
+            print(f"警告: 解像度は2の倍数を推奨します(現在: {width}x{height})")
             width = width // 2 * 2
             height = height // 2 * 2
             print(f"自動調整: {width}x{height}")
@@ -308,7 +308,7 @@ def main():
     print(f"Duration: {args.duration}s ({total_frames} frames)")
     print()
 
-    # blend2d 画像を初期化（フレーム間で再利用）
+    # blend2d 画像を初期化(フレーム間で再利用)
     img = Image(width, height)
 
     # フォントをロード
@@ -371,7 +371,7 @@ def main():
         }
         decoder.configure(decoder_config)
 
-    # raw-player を初期化（新 API）
+    # raw-player を初期化(新 API)
     title = (
         "Blend2D Animation Test (webcodecs)"
         if args.video_codec_type
@@ -379,7 +379,7 @@ def main():
     )
     player = VideoPlayer(width=width, height=height, title=title)
 
-    # キーコールバックを設定（ESC または q で終了）
+    # キーコールバックを設定(ESC または q で終了)
     def on_key(key: int) -> bool:
         # ESC (27) または q (113) で終了
         if key == 27 or key == 113:
@@ -414,16 +414,16 @@ def main():
     decoded_frame_sizes: list[int] = []  # デコード後
 
     # フレーム生成のペーシング用
-    frame_interval = 1.0 / fps  # フレーム間隔（秒）
+    frame_interval = 1.0 / fps  # フレーム間隔(秒)
     next_frame_time = time.perf_counter()
 
     try:
         while player.is_open and frame_number < total_frames:
-            # SDL イベントを処理（これでフレームもレンダリングされる）
+            # SDL イベントを処理(これでフレームもレンダリングされる)
             if not player.poll_events():
                 break
 
-            # 次のフレーム時刻まで待機（FPS に合わせてペーシング）
+            # 次のフレーム時刻まで待機(FPS に合わせてペーシング)
             now = time.perf_counter()
             if now < next_frame_time:
                 time.sleep(max(0, next_frame_time - now))
@@ -502,10 +502,10 @@ def main():
                     decoded_frame.close()
                     rendered_frames += 1
             else:
-                # 直接レンダリング（BGRA をそのまま使用）
+                # 直接レンダリング(BGRA をそのまま使用)
                 raw_frame_sizes.append(bgra.nbytes)
 
-                # enqueue（変換なし）
+                # enqueue(変換なし)
                 player.enqueue_video_bgra(bgra, pts_us)
                 rendered_frames += 1
 

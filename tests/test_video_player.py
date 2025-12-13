@@ -135,7 +135,7 @@ def test_enqueue_video_yuy2_invalid_shape():
 
     height = 240
 
-    # 不正な shape: 奇数幅は YUY2 として無効（2 ピクセルで 4 バイトのため）
+    # 不正な shape: 奇数幅は YUY2 として無効(2 ピクセルで 4 バイトのため)
     invalid_data = np.zeros((height, 321), dtype=np.uint8)
 
     with pytest.raises(Exception):
@@ -174,7 +174,7 @@ def test_enqueue_video_rgba_invalid_shape():
     height = 240
     width = 320
 
-    # 不正な shape: (H, W, 3) は RGBA として無効（4 チャンネル必要）
+    # 不正な shape: (H, W, 3) は RGBA として無効(4 チャンネル必要)
     invalid_data = np.zeros((height, width, 3), dtype=np.uint8)
 
     with pytest.raises(Exception):
@@ -213,7 +213,7 @@ def test_enqueue_video_bgra_invalid_shape():
     height = 240
     width = 320
 
-    # 不正な shape: (H, W, 3) は BGRA として無効（4 チャンネル必要）
+    # 不正な shape: (H, W, 3) は BGRA として無効(4 チャンネル必要)
     invalid_data = np.zeros((height, width, 3), dtype=np.uint8)
 
     with pytest.raises(Exception):

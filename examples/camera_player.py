@@ -84,7 +84,7 @@ def draw_overlay(
     font_scale = 0.7
     thickness = 2
     color = (255, 255, 255)  # 白
-    shadow_color = (0, 0, 0)  # 黒（影用）
+    shadow_color = (0, 0, 0)  # 黒(影用)
 
     # 表示するテキスト
     lines = [
@@ -97,7 +97,7 @@ def draw_overlay(
     # テキストを描画
     y_offset = 30
     for line in lines:
-        # 影を描画（読みやすくするため）
+        # 影を描画(読みやすくするため)
         cv2.putText(
             bgr_frame,
             line,
@@ -121,7 +121,7 @@ def main():
         "--duration",
         type=float,
         default=10.0,
-        help="再生時間（秒）。デフォルト: 10.0",
+        help="再生時間(秒)。デフォルト: 10.0",
     )
     parser.add_argument(
         "--camera",
@@ -152,7 +152,7 @@ def main():
         type=str,
         default=None,
         choices=["AV1", "H264", "H265", "VP8", "VP9"],
-        help="ビデオコーデック。指定しない場合は生データ（I420）を直接表示",
+        help="ビデオコーデック。指定しない場合は生データ(I420)を直接表示",
     )
     parser.add_argument(
         "--video-bitrate",
@@ -163,7 +163,7 @@ def main():
     parser.add_argument(
         "--flip-horizontal",
         action="store_true",
-        help="映像を左右反転（ミラー）",
+        help="映像を左右反転(ミラー)",
     )
     parser.add_argument(
         "--flip-vertical",
@@ -313,7 +313,7 @@ def main():
         title=f"Camera Test ({width}x{height} @ {fps}fps)",
     )
 
-    # キーコールバックを設定（ESC または q で終了）
+    # キーコールバックを設定(ESC または q で終了)
     def on_key(key: int) -> bool:
         # ESC (27) または q (113) で終了
         if key == 27 or key == 113:
@@ -347,7 +347,7 @@ def main():
 
     try:
         while player.is_open and frame_number < total_frames:
-            # SDL イベントを処理（フレームレンダリングも行う）
+            # SDL イベントを処理(フレームレンダリングも行う)
             if not player.poll_events():
                 break
 
@@ -386,14 +386,14 @@ def main():
             overlay_time = time.perf_counter() - overlay_start
             overlay_times.append(overlay_time)
 
-            # BGR → I420 変換（プレーン分離）
+            # BGR → I420 変換(プレーン分離)
             y_raw, u_raw, v_raw = bgr_to_i420_planes(bgr_frame)
             raw_frame_sizes.append(y_raw.nbytes + u_raw.nbytes + v_raw.nbytes)
 
             timestamp_us = int(frame_number * 1_000_000 / fps)
 
             if use_codec:
-                # VideoFrame を作成（エンコード用、1 次元 I420）
+                # VideoFrame を作成(エンコード用、1 次元 I420)
                 i420_data = np.concatenate(
                     [y_raw.flatten(), u_raw.flatten(), v_raw.flatten()]
                 )
@@ -481,7 +481,7 @@ def main():
                         f"enqueue={avg_enqueue * 1000:.1f}ms"
                     )
 
-            # FPS タイミング調整（絶対時間ベース）
+            # FPS タイミング調整(絶対時間ベース)
             next_frame_time = start_time + (frame_number) * frame_interval
             wait_time = next_frame_time - time.perf_counter()
             if wait_time > 0:

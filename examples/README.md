@@ -24,7 +24,7 @@ make develop
 ### 実行
 
 ```bash
-# 生データ（エンコードなし）
+# 生データ(エンコードなし)
 uv run python examples/blend2d_player.py
 
 # H.264 エンコード/デコード
@@ -41,7 +41,7 @@ uv run python examples/blend2d_player.py --resolution 1280x720 --fps 30
 
 | オプション | 説明 | デフォルト |
 |------------|------|------------|
-| `--duration` | 再生時間（秒） | 10.0 |
+| `--duration` | 再生時間(秒) | 10.0 |
 | `--fps` | フレームレート (30, 60, 120) | 60 |
 | `--video-codec-type` | コーデック (AV1, VP8, VP9, H264, H265) | なし |
 | `--video-bitrate` | ビットレート (kbps) | 8000 |
@@ -59,7 +59,7 @@ OpenCV でカメラ映像を取得し、raw-player で表示するサンプル�
 ### 実行
 
 ```bash
-# 生データ（エンコードなし）
+# 生データ(エンコードなし)
 uv run python examples/camera_player.py
 
 # H.264 エンコード/デコード
@@ -73,7 +73,7 @@ uv run python examples/camera_player.py --camera 0 --width 1920 --height 1080
 
 | オプション | 説明 | デフォルト |
 |------------|------|------------|
-| `--duration` | 再生時間（秒） | 10.0 |
+| `--duration` | 再生時間(秒) | 10.0 |
 | `--camera` | カメラデバイス番号 | 0 |
 | `--width` | 映像幅 | 1280 |
 | `--height` | 映像高さ | 720 |

@@ -31,7 +31,7 @@ void AudioPlayer::enqueue_audio(nb::ndarray<nb::c_contig, nb::device::cpu> pcm,
     channels = static_cast<int>(pcm.shape(1));
   }
 
-  // フォーマットを決定（int16 または float32）
+  // フォーマットを決定(int16 または float32)
   bool is_float = false;
   int sample_size = 0;
   auto dtype = pcm.dtype();
@@ -159,7 +159,7 @@ int64_t AudioPlayer::get_audio_clock_us() const {
 void AudioPlayer::play() {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  // 再生開始時刻を記録（初回のみ）
+  // 再生開始時刻を記録(初回のみ)
   if (play_start_time_ns_ == 0) {
     play_start_time_ns_ = SDL_GetTicksNS();
   }
@@ -234,7 +234,7 @@ nb::dict AudioPlayer::stats() const {
   // キューサイズ
   result["audio_queue_size"] = static_cast<int>(audio_queue_.size());
 
-  // 音声バッファ（ミリ秒）
+  // 音声バッファ(ミリ秒)
   float audio_buffer_ms = 0.0f;
   if (audio_stream_ && audio_sample_rate_ > 0) {
     int queued_bytes = SDL_GetAudioStreamQueued(audio_stream_);
@@ -277,7 +277,7 @@ nb::dict AudioPlayer::stats() const {
   }
   result["total_samples_played"] = total_samples_played;
 
-  // 経過時間（ms）
+  // 経過時間(ms)
   double elapsed_time_ms = 0.0;
   if (play_start_time_ns_ > 0) {
     uint64_t now_ns = SDL_GetTicksNS();
@@ -286,7 +286,7 @@ nb::dict AudioPlayer::stats() const {
   }
   result["elapsed_time_ms"] = elapsed_time_ms;
 
-  // ビットレート（kbps）
+  // ビットレート(kbps)
   double audio_bitrate_kbps = 0.0;
   if (audio_sample_rate_ > 0 && audio_channels_ > 0) {
     int sample_size = audio_is_float_ ? 4 : 2;

@@ -525,7 +525,7 @@ void VideoPlayer::play() {
     }
   }
 
-  // 再生開始時刻を記録（初回のみ）
+  // 再生開始時刻を記録(初回のみ)
   if (play_start_time_ns_ == 0) {
     play_start_time_ns_ = SDL_GetTicksNS();
     fps_calc_start_ns_ = play_start_time_ns_;
@@ -716,7 +716,7 @@ nb::dict VideoPlayer::stats() const {
   nb::dict result;
   result["video_queue_size"] = static_cast<int>(video_queue_.size());
 
-  // 音声キュー（ミリ秒）
+  // 音声キュー(ミリ秒)
   if (audio_stream_) {
     int queued_bytes = SDL_GetAudioStreamQueued(audio_stream_);
     int sample_size = (audio_is_float_ ? 4 : 2) * audio_channels_;
@@ -742,7 +742,7 @@ nb::dict VideoPlayer::stats() const {
   result["total_frames_enqueued"] = total_frames_enqueued_;
   result["total_frames_rendered"] = total_frames_rendered_;
 
-  // 映像バッファ時間（ms）
+  // 映像バッファ時間(ms)
   double video_buffer_ms = 0.0;
   if (video_queue_.size() >= 2) {
     int64_t first_pts = video_queue_.front().pts_us;
@@ -751,7 +751,7 @@ nb::dict VideoPlayer::stats() const {
   }
   result["video_buffer_ms"] = video_buffer_ms;
 
-  // 経過時間（ms）
+  // 経過時間(ms)
   double elapsed_time_ms = 0.0;
   if (play_start_time_ns_ > 0) {
     uint64_t now_ns = SDL_GetTicksNS();
@@ -760,7 +760,7 @@ nb::dict VideoPlayer::stats() const {
   }
   result["elapsed_time_ms"] = elapsed_time_ms;
 
-  // ビットレート（kbps）
+  // ビットレート(kbps)
   double video_bitrate_kbps = 0.0;
   if (current_fps_ > 0 && last_frame_size_bytes_ > 0) {
     video_bitrate_kbps = static_cast<double>(last_frame_size_bytes_) *

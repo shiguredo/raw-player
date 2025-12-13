@@ -25,9 +25,7 @@ Please read <https://github.com/shiguredo/oss/blob/master/README.en.md> before u
 
 PCM / I420 / NV12 / YUY2 / RGBA / BGRA データを PTS (Presentation Timestamp) に基づいて音声と映像を同期しながら再生します。
 
-
-https://github.com/user-attachments/assets/cdbb5b95-dbb7-4088-a842-0c66830e2a25
-
+<https://github.com/user-attachments/assets/cdbb5b95-dbb7-4088-a842-0c66830e2a25>
 
 ## 特徴
 
@@ -77,7 +75,7 @@ duration = 2.0
 t = np.linspace(0, duration, int(sample_rate * duration), dtype=np.float32)
 mono = 0.3 * np.sin(2 * np.pi * 440.0 * t)
 
-# ステレオに変換（shape: (frames, channels)）
+# ステレオに変換(shape: (frames, channels))
 stereo = np.column_stack([mono, mono])
 
 # PTS とサンプルレートを指定してキューに追加
@@ -100,7 +98,7 @@ y_plane = np.zeros((1080, 1920), dtype=np.uint8)
 u_plane = np.zeros((540, 960), dtype=np.uint8)
 v_plane = np.zeros((540, 960), dtype=np.uint8)
 
-# PTS（マイクロ秒）を指定してキューに追加
+# PTS(マイクロ秒)を指定してキューに追加
 player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us=0)
 player.play()
 
@@ -125,7 +123,7 @@ player = rp.VideoPlayer(width=1920, height=1080, title="NV12 Player")
 y_plane = np.zeros((1080, 1920), dtype=np.uint8)
 uv_plane = np.zeros((540, 1920), dtype=np.uint8)
 
-# PTS（マイクロ秒）を指定してキューに追加
+# PTS(マイクロ秒)を指定してキューに追加
 player.enqueue_video_nv12(y_plane, uv_plane, pts_us=0)
 player.play()
 
@@ -145,10 +143,10 @@ import raw_player as rp
 player = rp.VideoPlayer(width=1920, height=1080, title="YUY2 Player")
 
 # YUY2: パックドフォーマット (H, W*2)
-# Y0 U0 Y1 V0 Y2 U1 Y3 V1 ... の形式（2 ピクセルで 4 バイト）
+# Y0 U0 Y1 V0 Y2 U1 Y3 V1 ... の形式(2 ピクセルで 4 バイト)
 yuy2_data = np.zeros((1080, 1920 * 2), dtype=np.uint8)
 
-# PTS（マイクロ秒）を指定してキューに追加
+# PTS(マイクロ秒)を指定してキューに追加
 player.enqueue_video_yuy2(yuy2_data, pts_us=0)
 player.play()
 
@@ -170,7 +168,7 @@ player = rp.VideoPlayer(width=1920, height=1080, title="RGBA Player")
 # RGBA: (H, W, 4)
 rgba_data = np.zeros((1080, 1920, 4), dtype=np.uint8)
 
-# PTS（マイクロ秒）を指定してキューに追加
+# PTS(マイクロ秒)を指定してキューに追加
 player.enqueue_video_rgba(rgba_data, pts_us=0)
 player.play()
 
@@ -192,7 +190,7 @@ player = rp.VideoPlayer(width=1920, height=1080, title="BGRA Player")
 # BGRA: (H, W, 4)
 bgra_data = np.zeros((1080, 1920, 4), dtype=np.uint8)
 
-# PTS（マイクロ秒）を指定してキューに追加
+# PTS(マイクロ秒)を指定してキューに追加
 player.enqueue_video_bgra(bgra_data, pts_us=0)
 player.play()
 
@@ -212,7 +210,7 @@ import raw_player as rp
 # 映像と音声を統合したプレイヤー
 player = rp.VideoPlayer(width=1920, height=1080, title="AV Sync Player")
 
-# 映像フレームをキューに追加（I420 形式）
+# 映像フレームをキューに追加(I420 形式)
 player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us=0)
 
 # 音声データをキューに追加
@@ -250,15 +248,15 @@ player = AudioPlayer()
 | プロパティ | 説明 |
 |------------|------|
 | `is_playing` | 再生中かどうか |
-| `volume` | 音量（0.0〜1.0） |
+| `volume` | 音量(0.0〜1.0) |
 
 #### enqueue_audio の引数
 
-- `pcm`: 音声データ（int16 または float32 の numpy 配列）
+- `pcm`: 音声データ(int16 または float32 の numpy 配列)
   - 1D: `(frames,)` モノラル
   - 2D: `(frames, channels)` マルチチャンネル
-- `pts_us`: PTS（マイクロ秒）
-- `sample_rate`: サンプルレート（Hz）
+- `pts_us`: PTS(マイクロ秒)
+- `sample_rate`: サンプルレート(Hz)
 
 ### VideoPlayer
 
@@ -280,7 +278,7 @@ player = VideoPlayer(width=960, height=540, title="Raw Player")
 | `pause()` | 一時停止 |
 | `stop()` | 停止してキューをクリア |
 | `close()` | リソースを解放 |
-| `poll_events()` | イベント処理とフレーム描画（閉じられたら False） |
+| `poll_events()` | イベント処理とフレーム描画(閉じられたら False) |
 | `set_key_callback(callback)` | キーイベントコールバックを設定 |
 | `stats()` | 統計情報を取得 |
 
@@ -290,58 +288,58 @@ player = VideoPlayer(width=960, height=540, title="Raw Player")
 | `is_playing` | 再生中か |
 | `width` | ウィンドウ幅 |
 | `height` | ウィンドウ高さ |
-| `title` | ウィンドウタイトル（読み書き可） |
-| `renderer_name` | GPU レンダラー名（metal, vulkan など） |
-| `volume` | 音量（0.0〜1.0） |
+| `title` | ウィンドウタイトル(読み書き可) |
+| `renderer_name` | GPU レンダラー名(metal, vulkan など) |
+| `volume` | 音量(0.0〜1.0) |
 
 #### enqueue_video_i420 の引数
 
-- `y`: Y プレーン（uint8、shape: `(H, W)`）
-- `u`: U プレーン（uint8、shape: `(H/2, W/2)`）
-- `v`: V プレーン（uint8、shape: `(H/2, W/2)`）
-- `pts_us`: PTS（マイクロ秒）
+- `y`: Y プレーン(uint8、shape: `(H, W)`)
+- `u`: U プレーン(uint8、shape: `(H/2, W/2)`)
+- `v`: V プレーン(uint8、shape: `(H/2, W/2)`)
+- `pts_us`: PTS(マイクロ秒)
 
 #### enqueue_video_nv12 の引数
 
-- `y`: Y プレーン（uint8、shape: `(H, W)`）
-- `uv`: UV インターリーブプレーン（uint8、shape: `(H/2, W)`）
-- `pts_us`: PTS（マイクロ秒）
+- `y`: Y プレーン(uint8、shape: `(H, W)`)
+- `uv`: UV インターリーブプレーン(uint8、shape: `(H/2, W)`)
+- `pts_us`: PTS(マイクロ秒)
 
 #### enqueue_video_yuy2 の引数
 
-- `data`: YUY2 パックドデータ（uint8、shape: `(H, W*2)`）
-  - `Y0 U0 Y1 V0 Y2 U1 Y3 V1 ...` の形式（2 ピクセルで 4 バイト）
-- `pts_us`: PTS（マイクロ秒）
+- `data`: YUY2 パックドデータ(uint8、shape: `(H, W*2)`)
+  - `Y0 U0 Y1 V0 Y2 U1 Y3 V1 ...` の形式(2 ピクセルで 4 バイト)
+- `pts_us`: PTS(マイクロ秒)
 
 #### enqueue_video_rgba の引数
 
-- `data`: RGBA データ（uint8、shape: `(H, W, 4)`）
-- `pts_us`: PTS（マイクロ秒）
+- `data`: RGBA データ(uint8、shape: `(H, W, 4)`)
+- `pts_us`: PTS(マイクロ秒)
 
 #### enqueue_video_bgra の引数
 
-- `data`: BGRA データ（uint8、shape: `(H, W, 4)`）
-- `pts_us`: PTS（マイクロ秒）
+- `data`: BGRA データ(uint8、shape: `(H, W, 4)`)
+- `pts_us`: PTS(マイクロ秒)
 
 #### stats() の戻り値
 
 ```python
 {
-    "video_queue_size": int,      # 映像キュー内のフレーム数
-    "audio_queue_ms": float,      # 音声キューの長さ（ミリ秒）
-    "dropped_frames": int,        # ドロップしたフレーム数
-    "repeated_frames": int,       # 繰り返したフレーム数
-    "video_pts_us": int,          # 最後に描画した映像の PTS
-    "audio_pts_us": int,          # 現在の音声再生位置
-    "sync_diff_us": int,          # 音声と映像の差
-    "current_video_width": int,   # 現在の映像幅
-    "current_video_height": int,  # 現在の映像高さ
-    "current_fps": float,         # 現在の FPS
-    "total_frames_enqueued": int, # エンキューしたフレーム総数
-    "total_frames_rendered": int, # レンダリングしたフレーム総数
-    "video_buffer_ms": float,     # 映像バッファ時間（ミリ秒）
-    "elapsed_time_ms": float,     # 経過時間（ミリ秒）
-    "video_bitrate_kbps": float,  # 映像ビットレート（kbps）
+  "video_queue_size": int,      # 映像キュー内のフレーム数
+  "audio_queue_ms": float,      # 音声キューの長さ(ミリ秒)
+  "dropped_frames": int,        # ドロップしたフレーム数
+  "repeated_frames": int,       # 繰り返したフレーム数
+  "video_pts_us": int,          # 最後に描画した映像の PTS
+  "audio_pts_us": int,          # 現在の音声再生位置
+  "sync_diff_us": int,          # 音声と映像の差
+  "current_video_width": int,   # 現在の映像幅
+  "current_video_height": int,  # 現在の映像高さ
+  "current_fps": float,         # 現在の FPS
+  "total_frames_enqueued": int, # エンキューしたフレーム総数
+  "total_frames_rendered": int, # レンダリングしたフレーム総数
+  "video_buffer_ms": float,     # 映像バッファ時間(ミリ秒)
+  "elapsed_time_ms": float,     # 経過時間(ミリ秒)
+  "video_bitrate_kbps": float,  # 映像ビットレート(kbps)
 }
 ```
 
@@ -354,7 +352,7 @@ player = VideoPlayer(width=960, height=540, title="Raw Player")
 | `get_version()` | SDL のバージョン文字列を取得 |
 | `get_audio_driver()` | 現在の音声ドライバー名を取得 |
 | `get_video_driver()` | 現在の映像ドライバー名を取得 |
-| `get_gpu_driver()` | プライマリ GPU ドライバー名を取得（metal, vulkan, d3d12 など） |
+| `get_gpu_driver()` | プライマリ GPU ドライバー名を取得(metal, vulkan, d3d12 など) |
 | `get_num_gpu_drivers()` | 利用可能な GPU ドライバーの数を取得 |
 | `get_all_gpu_drivers()` | 利用可能な全ての GPU ドライバー名をリストで取得 |
 

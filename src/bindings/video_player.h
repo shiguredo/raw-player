@@ -103,10 +103,10 @@ class VideoPlayer {
  private:
   // 映像フレームのデータ構造
   struct VideoFrame {
-    int64_t pts_us;      // プレゼンテーションタイムスタンプ（マイクロ秒）
+    int64_t pts_us;      // プレゼンテーションタイムスタンプ(マイクロ秒)
     int width;           // 映像幅
     int height;          // 映像高さ
-    VideoFormat format;  // フォーマット（I420/NV12/YUY2/RGBA/BGRA）
+    VideoFormat format;  // フォーマット(I420/NV12/YUY2/RGBA/BGRA)
     std::vector<uint8_t> y_data;  // I420/NV12: Y プレーン、その他: パックドデータ
     std::vector<uint8_t> u_data;  // I420: U プレーン、NV12: UV プレーン、その他: 空
     std::vector<uint8_t> v_data;  // I420: V プレーン、その他: 空
@@ -114,7 +114,7 @@ class VideoPlayer {
 
   // 音声チャンクのデータ構造
   struct AudioChunk {
-    int64_t pts_us;   // プレゼンテーションタイムスタンプ（マイクロ秒）
+    int64_t pts_us;   // プレゼンテーションタイムスタンプ(マイクロ秒)
     int sample_rate;  // サンプルレート
     int channels;     // チャンネル数
     bool is_float;    // true: float32、false: int16
@@ -125,10 +125,10 @@ class VideoPlayer {
   SDL_Window* window_ = nullptr;
   SDL_Renderer* renderer_ = nullptr;
   SDL_Texture* texture_ = nullptr;
-  int window_width_ = 960;   // ウィンドウサイズ（表示用）
-  int window_height_ = 540;  // ウィンドウサイズ（表示用）
-  int texture_width_ = 0;    // 現在のテクスチャサイズ（映像解像度）
-  int texture_height_ = 0;   // 現在のテクスチャサイズ（映像解像度）
+  int window_width_ = 960;   // ウィンドウサイズ(表示用)
+  int window_height_ = 540;  // ウィンドウサイズ(表示用)
+  int texture_width_ = 0;    // 現在のテクスチャサイズ(映像解像度)
+  int texture_height_ = 0;   // 現在のテクスチャサイズ(映像解像度)
   VideoFormat texture_format_ = VideoFormat::I420;
   std::string title_ = "Raw Player";
   bool open_ = false;
@@ -153,7 +153,7 @@ class VideoPlayer {
 
   // 映像のみモード用のタイミング
   uint64_t video_start_time_ns_ =
-      0;  // 映像再生開始時のウォールクロック（ナノ秒）
+      0;  // 映像再生開始時のウォールクロック(ナノ秒)
   int64_t first_video_pts_us_ = 0;   // 最初の映像フレームの PTS
   bool video_only_started_ = false;  // 映像のみモードが開始されたか
 
@@ -168,7 +168,7 @@ class VideoPlayer {
   int64_t total_frames_enqueued_ = 0;  // enqueue された総フレーム数
   int64_t total_frames_rendered_ = 0;  // レンダリングされた総フレーム数
   uint64_t play_start_time_ns_ = 0;    // play() を呼んだ時刻
-  int64_t last_frame_size_bytes_ = 0;  // 最後のフレームサイズ（バイト）
+  int64_t last_frame_size_bytes_ = 0;  // 最後のフレームサイズ(バイト)
 
   // FPS 計算用
   uint64_t fps_calc_start_ns_ = 0;  // FPS 計算開始時刻

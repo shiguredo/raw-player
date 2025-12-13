@@ -20,7 +20,7 @@ void init_video_player(nb::module_& m);
 // SDL 初期化状態
 static bool sdl_initialized = false;
 
-// SDL を初期化（未初期化の場合のみ）
+// SDL を初期化(未初期化の場合のみ)
 static void ensure_sdl_init() {
   if (!sdl_initialized) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
