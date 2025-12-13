@@ -20,7 +20,7 @@ namespace nb = nanobind;
 void init_video_player(nb::module_& m);
 
 // 映像フレームフォーマット
-enum class VideoFormat { I420, NV12 };
+enum class VideoFormat { I420, NV12, YUY2 };
 
 class VideoPlayer {
  public:
@@ -44,6 +44,12 @@ class VideoPlayer {
   void enqueue_video_nv12(
       nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> y,
       nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> uv,
+      int64_t pts_us);
+
+  // YUY2 映像フレームをキューに追加
+  // data: uint8 (H, W*2)、パックドフォーマット Y0 U0 Y1 V0 ...
+  void enqueue_video_yuy2(
+      nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> data,
       int64_t pts_us);
 
   // 音声データをキューに追加
@@ -88,10 +94,10 @@ class VideoPlayer {
     int64_t pts_us;      // プレゼンテーションタイムスタンプ（マイクロ秒）
     int width;           // 映像幅
     int height;          // 映像高さ
-    VideoFormat format;  // フォーマット（I420/NV12）
-    std::vector<uint8_t> y_data;  // Y プレーン
-    std::vector<uint8_t> u_data;  // I420: U プレーン、NV12: UV プレーン
-    std::vector<uint8_t> v_data;  // I420: V プレーン、NV12: 空
+    VideoFormat format;  // フォーマット（I420/NV12/YUY2）
+    std::vector<uint8_t> y_data;  // I420/NV12: Y プレーン、YUY2: パックドデータ
+    std::vector<uint8_t> u_data;  // I420: U プレーン、NV12: UV プレーン、YUY2: 空
+    std::vector<uint8_t> v_data;  // I420: V プレーン、NV12/YUY2: 空
   };
 
   // 音声チャンクのデータ構造

@@ -57,9 +57,18 @@ void VideoPlayer::create_texture(int width, int height, VideoFormat format) {
     texture_ = nullptr;
   }
 
-  SDL_PixelFormat sdl_format = (format == VideoFormat::I420)
-                                   ? SDL_PIXELFORMAT_IYUV
-                                   : SDL_PIXELFORMAT_NV12;
+  SDL_PixelFormat sdl_format;
+  switch (format) {
+    case VideoFormat::I420:
+      sdl_format = SDL_PIXELFORMAT_IYUV;
+      break;
+    case VideoFormat::NV12:
+      sdl_format = SDL_PIXELFORMAT_NV12;
+      break;
+    case VideoFormat::YUY2:
+      sdl_format = SDL_PIXELFORMAT_YUY2;
+      break;
+  }
 
   texture_ = SDL_CreateTexture(renderer_, sdl_format,
                                SDL_TEXTUREACCESS_STREAMING, width, height);
@@ -153,6 +162,40 @@ void VideoPlayer::enqueue_video_nv12(
   // フレームサイズを記録
   last_frame_size_bytes_ =
       static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
+  total_frames_enqueued_++;
+  video_queue_.push_back(std::move(frame));
+}
+
+void VideoPlayer::enqueue_video_yuy2(
+    nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> data,
+    int64_t pts_us) {
+  // 次元を検証
+  if (data.ndim() != 2) {
+    throw std::invalid_argument("YUY2 data must be 2D");
+  }
+  int h = static_cast<int>(data.shape(0));
+  int packed_width = static_cast<int>(data.shape(1));
+
+  // YUY2: 2 ピクセルで 4 バイト、つまり width * 2 バイト/行
+  if (packed_width % 2 != 0) {
+    throw std::invalid_argument(
+        "YUY2 data width must be even (expected W*2 bytes per row)");
+  }
+  int w = packed_width / 2;
+
+  VideoFrame frame;
+  frame.pts_us = pts_us;
+  frame.width = w;
+  frame.height = h;
+  frame.format = VideoFormat::YUY2;
+
+  // パックドデータをコピー
+  frame.y_data.resize(data.nbytes());
+  std::memcpy(frame.y_data.data(), data.data(), data.nbytes());
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  // フレームサイズを記録
+  last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
   total_frames_enqueued_++;
   video_queue_.push_back(std::move(frame));
 }
@@ -285,14 +328,21 @@ void VideoPlayer::render_frame_internal(const VideoFrame& frame) {
       throw std::runtime_error(std::string("Failed to update YUV texture: ") +
                                SDL_GetError());
     }
-  } else {
-    // NV12
+  } else if (frame.format == VideoFormat::NV12) {
     int y_pitch = frame.width;
     int uv_pitch = frame.width;
 
     if (!SDL_UpdateNVTexture(texture_, nullptr, frame.y_data.data(), y_pitch,
                              frame.u_data.data(), uv_pitch)) {
       throw std::runtime_error(std::string("Failed to update NV12 texture: ") +
+                               SDL_GetError());
+    }
+  } else {
+    // YUY2: パックドフォーマット、pitch は width * 2
+    int pitch = frame.width * 2;
+
+    if (!SDL_UpdateTexture(texture_, nullptr, frame.y_data.data(), pitch)) {
+      throw std::runtime_error(std::string("Failed to update YUY2 texture: ") +
                                SDL_GetError());
     }
   }
@@ -667,6 +717,15 @@ void init_video_player(nb::module_& m) {
            "Args:\n"
            "    y: Y plane, uint8 (H, W)\n"
            "    uv: UV plane, uint8 (H/2, W)\n"
+           "    pts_us: Presentation timestamp in microseconds")
+
+      .def("enqueue_video_yuy2", &VideoPlayer::enqueue_video_yuy2,
+           nb::arg("data"), nb::arg("pts_us"),
+           nb::sig("def enqueue_video_yuy2(self, data: numpy.ndarray, "
+                   "pts_us: int) -> None"),
+           "Enqueue a YUY2 video frame.\n\n"
+           "Args:\n"
+           "    data: Packed YUY2 data, uint8 (H, W*2)\n"
            "    pts_us: Presentation timestamp in microseconds")
 
       .def("enqueue_audio", &VideoPlayer::enqueue_audio, nb::arg("pcm"),

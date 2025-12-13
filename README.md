@@ -23,7 +23,7 @@ Please read <https://github.com/shiguredo/oss/blob/master/README.en.md> before u
 
 [numpy.ndarray](https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html) 形式で渡された生の映像・音声データを再生する Python ライブラリです。
 
-PCM / I420 / NV12 データを PTS (Presentation Timestamp) に基づいて音声と映像を同期しながら再生します。
+PCM / I420 / NV12 / YUY2 データを PTS (Presentation Timestamp) に基づいて音声と映像を同期しながら再生します。
 
 
 https://github.com/user-attachments/assets/cdbb5b95-dbb7-4088-a842-0c66830e2a25
@@ -34,7 +34,7 @@ https://github.com/user-attachments/assets/cdbb5b95-dbb7-4088-a842-0c66830e2a25
 - 生の音声/映像入力データをそのまま再生できる
 - 入力データに numpy.ndarray を採用
 - 音声フォーマットは PCM (int16 / float32) に対応
-- 映像フォーマットは I420 (YUV420P) / NV12 に対応
+- 映像フォーマットは I420 (YUV420P) / NV12 / YUY2 に対応
 - PTS ベース音声をマスタークロックとした映像同期機能
 - GPU レンダリング
   - macOS: Metal
@@ -127,6 +127,29 @@ uv_plane = np.zeros((540, 1920), dtype=np.uint8)
 
 # PTS（マイクロ秒）を指定してキューに追加
 player.enqueue_video_nv12(y_plane, uv_plane, pts_us=0)
+player.play()
+
+while player.is_open:
+    if not player.poll_events():
+        break
+
+player.close()
+```
+
+### YUY2 再生
+
+```python
+import numpy as np
+import raw_player as rp
+
+player = rp.VideoPlayer(width=1920, height=1080, title="YUY2 Player")
+
+# YUY2: パックドフォーマット (H, W*2)
+# Y0 U0 Y1 V0 Y2 U1 Y3 V1 ... の形式（2 ピクセルで 4 バイト）
+yuy2_data = np.zeros((1080, 1920 * 2), dtype=np.uint8)
+
+# PTS（マイクロ秒）を指定してキューに追加
+player.enqueue_video_yuy2(yuy2_data, pts_us=0)
 player.play()
 
 while player.is_open:
@@ -289,6 +312,7 @@ player = VideoPlayer(width=960, height=540, title="Raw Player")
 |----------|------|
 | `enqueue_video_i420(y, u, v, pts_us)` | I420 フレームをキューに追加 |
 | `enqueue_video_nv12(y, uv, pts_us)` | NV12 フレームをキューに追加 |
+| `enqueue_video_yuy2(data, pts_us)` | YUY2 フレームをキューに追加 |
 | `enqueue_audio(pcm, pts_us, sample_rate)` | 音声データをキューに追加 |
 | `play()` | 再生開始 |
 | `pause()` | 一時停止 |
@@ -319,6 +343,12 @@ player = VideoPlayer(width=960, height=540, title="Raw Player")
 
 - `y`: Y プレーン（uint8、shape: `(H, W)`）
 - `uv`: UV インターリーブプレーン（uint8、shape: `(H/2, W)`）
+- `pts_us`: PTS（マイクロ秒）
+
+#### enqueue_video_yuy2 の引数
+
+- `data`: YUY2 パックドデータ（uint8、shape: `(H, W*2)`）
+  - `Y0 U0 Y1 V0 Y2 U1 Y3 V1 ...` の形式（2 ピクセルで 4 バイト）
 - `pts_us`: PTS（マイクロ秒）
 
 #### stats() の戻り値

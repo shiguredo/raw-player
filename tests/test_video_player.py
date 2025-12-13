@@ -106,6 +106,44 @@ def test_enqueue_video_nv12():
     player.close()
 
 
+def test_enqueue_video_yuy2():
+    """enqueue_video_yuy2 で YUY2 フレームをエンキューできることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    height = 240
+    width = 320
+
+    # YUY2: パックドフォーマット (H, W * 2)
+    yuy2_data = np.zeros((height, width * 2), dtype=np.uint8)
+
+    player.enqueue_video_yuy2(yuy2_data, pts_us=0)
+
+    stats = player.stats()
+    assert stats["video_queue_size"] == 1
+    assert stats["total_frames_enqueued"] == 1
+
+    player.close()
+
+
+def test_enqueue_video_yuy2_invalid_shape():
+    """enqueue_video_yuy2 に不正な shape を渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    height = 240
+
+    # 不正な shape: 奇数幅は YUY2 として無効（2 ピクセルで 4 バイトのため）
+    invalid_data = np.zeros((height, 321), dtype=np.uint8)
+
+    with pytest.raises(Exception):
+        player.enqueue_video_yuy2(invalid_data, pts_us=0)
+
+    player.close()
+
+
 def test_enqueue_video_i420_invalid_shape():
     """enqueue_video_i420 に不正な shape を渡すとエラーになることを確認"""
     import raw_player
