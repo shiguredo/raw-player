@@ -1,0 +1,6 @@
+{
+  "sdl3": {
+    "version": "3.2.28",
+    "repository": "https://github.com/libsdl-org/SDL"
+  }
+}
