@@ -13,6 +13,10 @@
 #include <string>
 #include <vector>
 
+#ifdef __APPLE__
+#include <CoreVideo/CoreVideo.h>
+#endif
+
 #include "sdl_types.h"
 
 namespace nb = nanobind;
@@ -45,6 +49,10 @@ class VideoPlayer {
       nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> y,
       nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> uv,
       int64_t pts_us);
+
+  // NV12 映像フレームをネイティブバッファからキューに追加
+  // native_buffer: PyCapsule (macOS: CVPixelBufferRef)
+  void enqueue_video_nv12(nb::object native_buffer, int64_t pts_us);
 
   // YUY2 映像フレームをキューに追加
   // data: uint8 (H, W*2)、パックドフォーマット Y0 U0 Y1 V0 ...
