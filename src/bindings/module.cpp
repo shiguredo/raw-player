@@ -3,6 +3,7 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 
@@ -17,18 +18,19 @@ void init_sdl_types(nb::module_& m);
 void init_audio_player(nb::module_& m);
 void init_video_player(nb::module_& m);
 
-// SDL 初期化状態
+// SDL 初期化状態 (Free-Threading 対応)
+static std::once_flag sdl_init_flag;
 static bool sdl_initialized = false;
 
-// SDL を初期化(未初期化の場合のみ)
+// SDL を初期化 (未初期化の場合のみ、スレッドセーフ)
 static void ensure_sdl_init() {
-  if (!sdl_initialized) {
+  std::call_once(sdl_init_flag, []() {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
       throw std::runtime_error(std::string("Failed to initialize SDL: ") +
                                SDL_GetError());
     }
     sdl_initialized = true;
-  }
+  });
 }
 
 // SDL をクリーンアップ

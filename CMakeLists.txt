@@ -150,6 +150,7 @@ endif()
 nanobind_add_module(
     _raw_player_py
     NB_STATIC
+    FREE_THREADED
     src/bindings/module.cpp
     src/bindings/sdl_types.cpp
     src/bindings/audio_player.cpp
