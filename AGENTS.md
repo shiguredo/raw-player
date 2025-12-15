@@ -91,9 +91,12 @@
 
 - `Optional` ではなく `| None` を使うこと
 
-### GIL
+### Free-Threading
 
-- GIL の取得と解放は nanobind の仕組みを利用すること
+- Free-Threading 環境では GIL は存在しない
+- GIL の取得と解放という表現は使わないこと
+- nanobind の `gil_scoped_release` は「Python ランタイムからデタッチ」として使用する
+- nanobind の `gil_scoped_acquire` は「Python ランタイムにアタッチ」として使用する
 
 ### pytest
 
