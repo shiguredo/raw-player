@@ -34,6 +34,7 @@ PCM / I420 / NV12 / YUY2 / RGBA / BGRA データを PTS (Presentation Timestamp)
 - 音声フォーマットは PCM (int16 / float32) に対応
 - 映像フォーマットは I420 (YUV420P) / NV12 / YUY2 / RGBA / BGRA に対応
 - PTS ベース音声をマスタークロックとした映像同期機能
+- 単一フレームの静止画表示に対応
 - GPU レンダリング
   - macOS: Metal
   - Windows: Vulkan / Direct3D 12
