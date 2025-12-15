@@ -41,7 +41,7 @@ static void cleanup_sdl() {
   }
 }
 
-NB_MODULE(_raw_player_py, m) {
+NB_MODULE(raw_player_ext, m) {
   m.doc() = "Raw audio and video playback bindings for Python";
 
   // モジュールインポート時に SDL を初期化
