@@ -105,6 +105,9 @@ jobs:
         run: |
           uv sync --group pypi
           uv run auditwheel repair dist/*.whl --strip --only-plat
+        env:
+          NO_UV_SYNC: 1
+
       - name: Upload Repaired Wheels
         uses: actions/upload-artifact@v6
         with:
