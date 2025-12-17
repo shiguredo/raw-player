@@ -5,6 +5,31 @@
 #include <cstring>
 #include <stdexcept>
 
+#ifdef __APPLE__
+// CVPixelBuffer のロック/アンロックを RAII で管理するガードクラス
+class CVPixelBufferLockGuard {
+ public:
+  explicit CVPixelBufferLockGuard(CVPixelBufferRef buffer) : buffer_(buffer) {
+    CVReturn result =
+        CVPixelBufferLockBaseAddress(buffer_, kCVPixelBufferLock_ReadOnly);
+    if (result != kCVReturnSuccess) {
+      throw std::runtime_error("Failed to lock CVPixelBuffer");
+    }
+  }
+
+  ~CVPixelBufferLockGuard() {
+    CVPixelBufferUnlockBaseAddress(buffer_, kCVPixelBufferLock_ReadOnly);
+  }
+
+  // コピー禁止
+  CVPixelBufferLockGuard(const CVPixelBufferLockGuard&) = delete;
+  CVPixelBufferLockGuard& operator=(const CVPixelBufferLockGuard&) = delete;
+
+ private:
+  CVPixelBufferRef buffer_;
+};
+#endif
+
 VideoPlayer::VideoPlayer(int width, int height, const std::string& title)
     : window_width_(width), window_height_(height), title_(title) {
   // ウィンドウを作成
@@ -114,28 +139,39 @@ void VideoPlayer::enqueue_video_i420(
     throw std::invalid_argument("V plane must be 2D with shape (H/2, W/2)");
   }
 
+  // Python ランタイムからデタッチ前にポインタとサイズを取得
+  const uint8_t* y_ptr = y.data();
+  const uint8_t* u_ptr = u.data();
+  const uint8_t* v_ptr = v.data();
+  size_t y_size = y.nbytes();
+  size_t u_size = u.nbytes();
+  size_t v_size = v.nbytes();
+
   VideoFrame frame;
   frame.pts_us = pts_us;
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::I420;
 
-  // データをコピー
-  frame.y_data.resize(y.nbytes());
-  std::memcpy(frame.y_data.data(), y.data(), y.nbytes());
+  // Python ランタイムからデタッチしてデータコピー
+  {
+    nb::gil_scoped_release release;
 
-  frame.u_data.resize(u.nbytes());
-  std::memcpy(frame.u_data.data(), u.data(), u.nbytes());
+    frame.y_data.resize(y_size);
+    std::memcpy(frame.y_data.data(), y_ptr, y_size);
 
-  frame.v_data.resize(v.nbytes());
-  std::memcpy(frame.v_data.data(), v.data(), v.nbytes());
+    frame.u_data.resize(u_size);
+    std::memcpy(frame.u_data.data(), u_ptr, u_size);
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  // フレームサイズを記録
-  last_frame_size_bytes_ = static_cast<int64_t>(
-      frame.y_data.size() + frame.u_data.size() + frame.v_data.size());
-  total_frames_enqueued_++;
-  video_queue_.push_back(std::move(frame));
+    frame.v_data.resize(v_size);
+    std::memcpy(frame.v_data.data(), v_ptr, v_size);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ = static_cast<int64_t>(
+        frame.y_data.size() + frame.u_data.size() + frame.v_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
 }
 
 void VideoPlayer::enqueue_video_nv12(
@@ -153,25 +189,126 @@ void VideoPlayer::enqueue_video_nv12(
     throw std::invalid_argument("UV plane must be 2D with shape (H/2, W)");
   }
 
+  // Python ランタイムからデタッチ前にポインタとサイズを取得
+  const uint8_t* y_ptr = y.data();
+  const uint8_t* uv_ptr = uv.data();
+  size_t y_size = y.nbytes();
+  size_t uv_size = uv.nbytes();
+
   VideoFrame frame;
   frame.pts_us = pts_us;
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::NV12;
 
-  // データをコピー
-  frame.y_data.resize(y.nbytes());
-  std::memcpy(frame.y_data.data(), y.data(), y.nbytes());
+  // Python ランタイムからデタッチしてデータコピー
+  {
+    nb::gil_scoped_release release;
 
-  frame.u_data.resize(uv.nbytes());
-  std::memcpy(frame.u_data.data(), uv.data(), uv.nbytes());
+    frame.y_data.resize(y_size);
+    std::memcpy(frame.y_data.data(), y_ptr, y_size);
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  // フレームサイズを記録
-  last_frame_size_bytes_ =
-      static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
-  total_frames_enqueued_++;
-  video_queue_.push_back(std::move(frame));
+    frame.u_data.resize(uv_size);
+    std::memcpy(frame.u_data.data(), uv_ptr, uv_size);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ =
+        static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
+}
+
+void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
+#ifdef __APPLE__
+  // PyCapsule から CVPixelBufferRef を取得
+  if (!nb::isinstance<nb::capsule>(native_buffer)) {
+    throw std::invalid_argument(
+        "native_buffer must be a PyCapsule containing CVPixelBufferRef");
+  }
+
+  nb::capsule capsule = nb::cast<nb::capsule>(native_buffer);
+  const char* name = capsule.name();
+  if (name == nullptr || std::strcmp(name, "CVPixelBufferRef") != 0) {
+    throw std::invalid_argument(
+        "native_buffer must be a PyCapsule with name 'CVPixelBufferRef'");
+  }
+
+  CVPixelBufferRef pixel_buffer =
+      static_cast<CVPixelBufferRef>(capsule.data());
+  if (pixel_buffer == nullptr) {
+    throw std::invalid_argument("native_buffer contains null pointer");
+  }
+
+  // ピクセルフォーマットを確認
+  OSType pixel_format = CVPixelBufferGetPixelFormatType(pixel_buffer);
+  if (pixel_format != kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange &&
+      pixel_format != kCVPixelFormatType_420YpCbCr8BiPlanarFullRange) {
+    throw std::invalid_argument(
+        "native_buffer must contain NV12 format CVPixelBuffer");
+  }
+
+  // サイズを取得
+  int w = static_cast<int>(CVPixelBufferGetWidth(pixel_buffer));
+  int h = static_cast<int>(CVPixelBufferGetHeight(pixel_buffer));
+
+  VideoFrame frame;
+  frame.pts_us = pts_us;
+  frame.width = w;
+  frame.height = h;
+  frame.format = VideoFormat::NV12;
+
+  // Python ランタイムからデタッチしてデータコピー
+  // CVPixelBufferRef はネイティブポインタなのでデタッチ後も安全に使用可能
+  {
+    nb::gil_scoped_release release;
+
+    // RAII ガードでロック/アンロックを管理
+    CVPixelBufferLockGuard lock_guard(pixel_buffer);
+
+    // Y プレーンを取得
+    uint8_t* y_base = static_cast<uint8_t*>(
+        CVPixelBufferGetBaseAddressOfPlane(pixel_buffer, 0));
+    size_t y_stride = CVPixelBufferGetBytesPerRowOfPlane(pixel_buffer, 0);
+
+    // UV プレーンを取得
+    uint8_t* uv_base = static_cast<uint8_t*>(
+        CVPixelBufferGetBaseAddressOfPlane(pixel_buffer, 1));
+    size_t uv_stride = CVPixelBufferGetBytesPerRowOfPlane(pixel_buffer, 1);
+
+    // Y プレーンをコピー
+    frame.y_data.resize(static_cast<size_t>(w * h));
+    if (y_stride == static_cast<size_t>(w)) {
+      std::memcpy(frame.y_data.data(), y_base, frame.y_data.size());
+    } else {
+      for (int row = 0; row < h; ++row) {
+        std::memcpy(frame.y_data.data() + row * w, y_base + row * y_stride, w);
+      }
+    }
+
+    // UV プレーンをコピー
+    int uv_height = h / 2;
+    frame.u_data.resize(static_cast<size_t>(w * uv_height));
+    if (uv_stride == static_cast<size_t>(w)) {
+      std::memcpy(frame.u_data.data(), uv_base, frame.u_data.size());
+    } else {
+      for (int row = 0; row < uv_height; ++row) {
+        std::memcpy(frame.u_data.data() + row * w, uv_base + row * uv_stride, w);
+      }
+    }
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ =
+        static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
+#else
+  (void)native_buffer;
+  (void)pts_us;
+  throw std::runtime_error(
+      "native_buffer is only supported on macOS");
+#endif
 }
 
 void VideoPlayer::enqueue_video_yuy2(
@@ -191,21 +328,28 @@ void VideoPlayer::enqueue_video_yuy2(
   }
   int w = packed_width / 2;
 
+  // Python ランタイムからデタッチ前にポインタとサイズを取得
+  const uint8_t* data_ptr = data.data();
+  size_t data_size = data.nbytes();
+
   VideoFrame frame;
   frame.pts_us = pts_us;
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::YUY2;
 
-  // パックドデータをコピー
-  frame.y_data.resize(data.nbytes());
-  std::memcpy(frame.y_data.data(), data.data(), data.nbytes());
+  // Python ランタイムからデタッチしてデータコピー
+  {
+    nb::gil_scoped_release release;
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  // フレームサイズを記録
-  last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
-  total_frames_enqueued_++;
-  video_queue_.push_back(std::move(frame));
+    frame.y_data.resize(data_size);
+    std::memcpy(frame.y_data.data(), data_ptr, data_size);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
 }
 
 void VideoPlayer::enqueue_video_rgba(
@@ -223,21 +367,28 @@ void VideoPlayer::enqueue_video_rgba(
     throw std::invalid_argument("RGBA data must have 4 channels");
   }
 
+  // Python ランタイムからデタッチ前にポインタとサイズを取得
+  const uint8_t* data_ptr = data.data();
+  size_t data_size = data.nbytes();
+
   VideoFrame frame;
   frame.pts_us = pts_us;
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::RGBA;
 
-  // パックドデータをコピー
-  frame.y_data.resize(data.nbytes());
-  std::memcpy(frame.y_data.data(), data.data(), data.nbytes());
+  // Python ランタイムからデタッチしてデータコピー
+  {
+    nb::gil_scoped_release release;
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  // フレームサイズを記録
-  last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
-  total_frames_enqueued_++;
-  video_queue_.push_back(std::move(frame));
+    frame.y_data.resize(data_size);
+    std::memcpy(frame.y_data.data(), data_ptr, data_size);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
 }
 
 void VideoPlayer::enqueue_video_bgra(
@@ -255,21 +406,28 @@ void VideoPlayer::enqueue_video_bgra(
     throw std::invalid_argument("BGRA data must have 4 channels");
   }
 
+  // Python ランタイムからデタッチ前にポインタとサイズを取得
+  const uint8_t* data_ptr = data.data();
+  size_t data_size = data.nbytes();
+
   VideoFrame frame;
   frame.pts_us = pts_us;
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::BGRA;
 
-  // パックドデータをコピー
-  frame.y_data.resize(data.nbytes());
-  std::memcpy(frame.y_data.data(), data.data(), data.nbytes());
+  // Python ランタイムからデタッチしてデータコピー
+  {
+    nb::gil_scoped_release release;
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  // フレームサイズを記録
-  last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
-  total_frames_enqueued_++;
-  video_queue_.push_back(std::move(frame));
+    frame.y_data.resize(data_size);
+    std::memcpy(frame.y_data.data(), data_ptr, data_size);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
 }
 
 void VideoPlayer::enqueue_audio(nb::ndarray<nb::c_contig, nb::device::cpu> pcm,
@@ -797,15 +955,31 @@ void init_video_player(nb::module_& m) {
            "    v: V plane, uint8 (H/2, W/2)\n"
            "    pts_us: Presentation timestamp in microseconds")
 
-      .def("enqueue_video_nv12", &VideoPlayer::enqueue_video_nv12, nb::arg("y"),
-           nb::arg("uv"), nb::arg("pts_us"),
-           nb::sig("def enqueue_video_nv12(self, y: numpy.ndarray, "
-                   "uv: numpy.ndarray, pts_us: int) -> None"),
-           "Enqueue an NV12 video frame.\n\n"
-           "Args:\n"
-           "    y: Y plane, uint8 (H, W)\n"
-           "    uv: UV plane, uint8 (H/2, W)\n"
-           "    pts_us: Presentation timestamp in microseconds")
+      .def(
+          "enqueue_video_nv12",
+          static_cast<void (VideoPlayer::*)(
+              nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu>,
+              nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu>, int64_t)>(
+              &VideoPlayer::enqueue_video_nv12),
+          nb::arg("y"), nb::arg("uv"), nb::arg("pts_us"),
+          nb::sig("def enqueue_video_nv12(self, y: numpy.ndarray, "
+                  "uv: numpy.ndarray, pts_us: int) -> None"),
+          "Enqueue an NV12 video frame.\n\n"
+          "Args:\n"
+          "    y: Y plane, uint8 (H, W)\n"
+          "    uv: UV plane, uint8 (H/2, W)\n"
+          "    pts_us: Presentation timestamp in microseconds")
+      .def(
+          "enqueue_video_nv12",
+          static_cast<void (VideoPlayer::*)(nb::object, int64_t)>(
+              &VideoPlayer::enqueue_video_nv12),
+          nb::arg("native_buffer"), nb::arg("pts_us"),
+          nb::sig("def enqueue_video_nv12(self, native_buffer: object, "
+                  "pts_us: int) -> None"),
+          "Enqueue an NV12 video frame from native buffer.\n\n"
+          "Args:\n"
+          "    native_buffer: PyCapsule containing CVPixelBufferRef (macOS)\n"
+          "    pts_us: Presentation timestamp in microseconds")
 
       .def("enqueue_video_yuy2", &VideoPlayer::enqueue_video_yuy2,
            nb::arg("data"), nb::arg("pts_us"),

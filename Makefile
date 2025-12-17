@@ -4,12 +4,12 @@ sync:
 	uv sync
 
 
-wheel: sync
+wheel:
 	uv build --wheel
 
 develop: wheel
 	uv pip install -e . --force-reinstall
-	@cp _build/cp*/__init__.pyi src/raw_player/
+	@cp _build/cp*/raw_player_ext.pyi src/raw_player/
 
 test: develop
 	NO_UV_SYNC=1 uv run pytest --timeout=60
