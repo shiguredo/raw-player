@@ -1,6 +1,7 @@
 # raw-player
 
 [![PyPI](https://img.shields.io/pypi/v/raw-player)](https://pypi.org/project/raw-player/)
+[![SPEC 0 — Minimum Supported Dependencies](https://img.shields.io/badge/SPEC-0-green?labelColor=%23004811&color=%235CA038)](https://scientific-python.org/specs/spec-0000/)
 [![image](https://img.shields.io/pypi/pyversions/raw-player.svg)](https://pypi.python.org/pypi/raw-player)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Actions status](https://github.com/shiguredo/raw-player/workflows/wheel/badge.svg)](https://github.com/shiguredo/raw-player/actions)
@@ -47,6 +48,9 @@ PCM / I420 / NV12 / YUY2 / RGBA / BGRA データを PTS (Presentation Timestamp)
 - macOS 15 arm64
 - Ubuntu 24.04 x86_64
 - Ubuntu 24.04 arm64
+- Ubuntu 22.04 x86_64
+- Ubuntu 22.04 arm64
+- Windows Server 2025 x86_64
 - Windows 11 x86_64
 
 ## 対応 Python
