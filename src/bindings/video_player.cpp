@@ -139,28 +139,39 @@ void VideoPlayer::enqueue_video_i420(
     throw std::invalid_argument("V plane must be 2D with shape (H/2, W/2)");
   }
 
+  // Python ランタイムからデタッチ前にポインタとサイズを取得
+  const uint8_t* y_ptr = y.data();
+  const uint8_t* u_ptr = u.data();
+  const uint8_t* v_ptr = v.data();
+  size_t y_size = y.nbytes();
+  size_t u_size = u.nbytes();
+  size_t v_size = v.nbytes();
+
   VideoFrame frame;
   frame.pts_us = pts_us;
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::I420;
 
-  // データをコピー
-  frame.y_data.resize(y.nbytes());
-  std::memcpy(frame.y_data.data(), y.data(), y.nbytes());
+  // Python ランタイムからデタッチしてデータコピー
+  {
+    nb::gil_scoped_release release;
 
-  frame.u_data.resize(u.nbytes());
-  std::memcpy(frame.u_data.data(), u.data(), u.nbytes());
+    frame.y_data.resize(y_size);
+    std::memcpy(frame.y_data.data(), y_ptr, y_size);
 
-  frame.v_data.resize(v.nbytes());
-  std::memcpy(frame.v_data.data(), v.data(), v.nbytes());
+    frame.u_data.resize(u_size);
+    std::memcpy(frame.u_data.data(), u_ptr, u_size);
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  // フレームサイズを記録
-  last_frame_size_bytes_ = static_cast<int64_t>(
-      frame.y_data.size() + frame.u_data.size() + frame.v_data.size());
-  total_frames_enqueued_++;
-  video_queue_.push_back(std::move(frame));
+    frame.v_data.resize(v_size);
+    std::memcpy(frame.v_data.data(), v_ptr, v_size);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ = static_cast<int64_t>(
+        frame.y_data.size() + frame.u_data.size() + frame.v_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
 }
 
 void VideoPlayer::enqueue_video_nv12(
@@ -178,25 +189,34 @@ void VideoPlayer::enqueue_video_nv12(
     throw std::invalid_argument("UV plane must be 2D with shape (H/2, W)");
   }
 
+  // Python ランタイムからデタッチ前にポインタとサイズを取得
+  const uint8_t* y_ptr = y.data();
+  const uint8_t* uv_ptr = uv.data();
+  size_t y_size = y.nbytes();
+  size_t uv_size = uv.nbytes();
+
   VideoFrame frame;
   frame.pts_us = pts_us;
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::NV12;
 
-  // データをコピー
-  frame.y_data.resize(y.nbytes());
-  std::memcpy(frame.y_data.data(), y.data(), y.nbytes());
+  // Python ランタイムからデタッチしてデータコピー
+  {
+    nb::gil_scoped_release release;
 
-  frame.u_data.resize(uv.nbytes());
-  std::memcpy(frame.u_data.data(), uv.data(), uv.nbytes());
+    frame.y_data.resize(y_size);
+    std::memcpy(frame.y_data.data(), y_ptr, y_size);
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  // フレームサイズを記録
-  last_frame_size_bytes_ =
-      static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
-  total_frames_enqueued_++;
-  video_queue_.push_back(std::move(frame));
+    frame.u_data.resize(uv_size);
+    std::memcpy(frame.u_data.data(), uv_ptr, uv_size);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ =
+        static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
 }
 
 void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
@@ -238,9 +258,12 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
   frame.height = h;
   frame.format = VideoFormat::NV12;
 
-  // RAII ガードでロック/アンロックを管理
-  // スコープ終了時に自動的にアンロックされる
+  // Python ランタイムからデタッチしてデータコピー
+  // CVPixelBufferRef はネイティブポインタなのでデタッチ後も安全に使用可能
   {
+    nb::gil_scoped_release release;
+
+    // RAII ガードでロック/アンロックを管理
     CVPixelBufferLockGuard lock_guard(pixel_buffer);
 
     // Y プレーンを取得
@@ -273,13 +296,13 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
         std::memcpy(frame.u_data.data() + row * w, uv_base + row * uv_stride, w);
       }
     }
-  }
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  last_frame_size_bytes_ =
-      static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
-  total_frames_enqueued_++;
-  video_queue_.push_back(std::move(frame));
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ =
+        static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
 #else
   (void)native_buffer;
   (void)pts_us;
@@ -305,21 +328,28 @@ void VideoPlayer::enqueue_video_yuy2(
   }
   int w = packed_width / 2;
 
+  // Python ランタイムからデタッチ前にポインタとサイズを取得
+  const uint8_t* data_ptr = data.data();
+  size_t data_size = data.nbytes();
+
   VideoFrame frame;
   frame.pts_us = pts_us;
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::YUY2;
 
-  // パックドデータをコピー
-  frame.y_data.resize(data.nbytes());
-  std::memcpy(frame.y_data.data(), data.data(), data.nbytes());
+  // Python ランタイムからデタッチしてデータコピー
+  {
+    nb::gil_scoped_release release;
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  // フレームサイズを記録
-  last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
-  total_frames_enqueued_++;
-  video_queue_.push_back(std::move(frame));
+    frame.y_data.resize(data_size);
+    std::memcpy(frame.y_data.data(), data_ptr, data_size);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
 }
 
 void VideoPlayer::enqueue_video_rgba(
@@ -337,21 +367,28 @@ void VideoPlayer::enqueue_video_rgba(
     throw std::invalid_argument("RGBA data must have 4 channels");
   }
 
+  // Python ランタイムからデタッチ前にポインタとサイズを取得
+  const uint8_t* data_ptr = data.data();
+  size_t data_size = data.nbytes();
+
   VideoFrame frame;
   frame.pts_us = pts_us;
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::RGBA;
 
-  // パックドデータをコピー
-  frame.y_data.resize(data.nbytes());
-  std::memcpy(frame.y_data.data(), data.data(), data.nbytes());
+  // Python ランタイムからデタッチしてデータコピー
+  {
+    nb::gil_scoped_release release;
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  // フレームサイズを記録
-  last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
-  total_frames_enqueued_++;
-  video_queue_.push_back(std::move(frame));
+    frame.y_data.resize(data_size);
+    std::memcpy(frame.y_data.data(), data_ptr, data_size);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
 }
 
 void VideoPlayer::enqueue_video_bgra(
@@ -369,21 +406,28 @@ void VideoPlayer::enqueue_video_bgra(
     throw std::invalid_argument("BGRA data must have 4 channels");
   }
 
+  // Python ランタイムからデタッチ前にポインタとサイズを取得
+  const uint8_t* data_ptr = data.data();
+  size_t data_size = data.nbytes();
+
   VideoFrame frame;
   frame.pts_us = pts_us;
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::BGRA;
 
-  // パックドデータをコピー
-  frame.y_data.resize(data.nbytes());
-  std::memcpy(frame.y_data.data(), data.data(), data.nbytes());
+  // Python ランタイムからデタッチしてデータコピー
+  {
+    nb::gil_scoped_release release;
 
-  std::lock_guard<std::mutex> lock(mutex_);
-  // フレームサイズを記録
-  last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
-  total_frames_enqueued_++;
-  video_queue_.push_back(std::move(frame));
+    frame.y_data.resize(data_size);
+    std::memcpy(frame.y_data.data(), data_ptr, data_size);
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
 }
 
 void VideoPlayer::enqueue_audio(nb::ndarray<nb::c_contig, nb::device::cpu> pcm,
