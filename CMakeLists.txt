@@ -206,21 +206,23 @@ else()
     )
 endif()
 
-# .pyi スタブファイルを生成
+# 型スタブ (.pyi) ファイルの自動生成
 nanobind_add_stub(
-    raw_player_ext_stub
+    raw_player_stub
     MODULE raw_player_ext
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/raw_player_ext.pyi
+    OUTPUT raw_player_ext.pyi
     PYTHON_PATH $<TARGET_FILE_DIR:raw_player_ext>
     DEPENDS raw_player_ext
+    MARKER_FILE py.typed
 )
 
-# モジュールをインストール
-install(TARGETS raw_player_ext LIBRARY DESTINATION raw_player)
+# Wheel に配置するためのインストール先を指定
+set(PY_PACKAGE "raw_player")
+install(TARGETS raw_player_ext
+    LIBRARY DESTINATION ${PY_PACKAGE}
+    RUNTIME DESTINATION ${PY_PACKAGE}
+)
 
-# .pyi スタブファイルをインストール
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/raw_player_ext.pyi DESTINATION raw_player)
-
-# py.typed マーカーファイルを生成してインストール
-file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/py.typed "")
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/py.typed DESTINATION raw_player)
+# 型スタブファイルとマーカーファイルをインストール
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/raw_player_ext.pyi DESTINATION ${PY_PACKAGE})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/py.typed DESTINATION ${PY_PACKAGE})
