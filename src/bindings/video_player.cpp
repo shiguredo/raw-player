@@ -5,6 +5,31 @@
 #include <cstring>
 #include <stdexcept>
 
+#ifdef __APPLE__
+// CVPixelBuffer のロック/アンロックを RAII で管理するガードクラス
+class CVPixelBufferLockGuard {
+ public:
+  explicit CVPixelBufferLockGuard(CVPixelBufferRef buffer) : buffer_(buffer) {
+    CVReturn result =
+        CVPixelBufferLockBaseAddress(buffer_, kCVPixelBufferLock_ReadOnly);
+    if (result != kCVReturnSuccess) {
+      throw std::runtime_error("Failed to lock CVPixelBuffer");
+    }
+  }
+
+  ~CVPixelBufferLockGuard() {
+    CVPixelBufferUnlockBaseAddress(buffer_, kCVPixelBufferLock_ReadOnly);
+  }
+
+  // コピー禁止
+  CVPixelBufferLockGuard(const CVPixelBufferLockGuard&) = delete;
+  CVPixelBufferLockGuard& operator=(const CVPixelBufferLockGuard&) = delete;
+
+ private:
+  CVPixelBufferRef buffer_;
+};
+#endif
+
 VideoPlayer::VideoPlayer(int width, int height, const std::string& title)
     : window_width_(width), window_height_(height), title_(title) {
   // ウィンドウを作成
@@ -207,52 +232,48 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
   int w = static_cast<int>(CVPixelBufferGetWidth(pixel_buffer));
   int h = static_cast<int>(CVPixelBufferGetHeight(pixel_buffer));
 
-  // ロックしてデータにアクセス
-  CVReturn lock_result =
-      CVPixelBufferLockBaseAddress(pixel_buffer, kCVPixelBufferLock_ReadOnly);
-  if (lock_result != kCVReturnSuccess) {
-    throw std::runtime_error("Failed to lock CVPixelBuffer");
-  }
-
-  // Y プレーンを取得
-  uint8_t* y_base =
-      static_cast<uint8_t*>(CVPixelBufferGetBaseAddressOfPlane(pixel_buffer, 0));
-  size_t y_stride = CVPixelBufferGetBytesPerRowOfPlane(pixel_buffer, 0);
-
-  // UV プレーンを取得
-  uint8_t* uv_base =
-      static_cast<uint8_t*>(CVPixelBufferGetBaseAddressOfPlane(pixel_buffer, 1));
-  size_t uv_stride = CVPixelBufferGetBytesPerRowOfPlane(pixel_buffer, 1);
-
   VideoFrame frame;
   frame.pts_us = pts_us;
   frame.width = w;
   frame.height = h;
   frame.format = VideoFormat::NV12;
 
-  // Y プレーンをコピー
-  frame.y_data.resize(static_cast<size_t>(w * h));
-  if (y_stride == static_cast<size_t>(w)) {
-    std::memcpy(frame.y_data.data(), y_base, frame.y_data.size());
-  } else {
-    for (int row = 0; row < h; ++row) {
-      std::memcpy(frame.y_data.data() + row * w, y_base + row * y_stride, w);
+  // RAII ガードでロック/アンロックを管理
+  // スコープ終了時に自動的にアンロックされる
+  {
+    CVPixelBufferLockGuard lock_guard(pixel_buffer);
+
+    // Y プレーンを取得
+    uint8_t* y_base = static_cast<uint8_t*>(
+        CVPixelBufferGetBaseAddressOfPlane(pixel_buffer, 0));
+    size_t y_stride = CVPixelBufferGetBytesPerRowOfPlane(pixel_buffer, 0);
+
+    // UV プレーンを取得
+    uint8_t* uv_base = static_cast<uint8_t*>(
+        CVPixelBufferGetBaseAddressOfPlane(pixel_buffer, 1));
+    size_t uv_stride = CVPixelBufferGetBytesPerRowOfPlane(pixel_buffer, 1);
+
+    // Y プレーンをコピー
+    frame.y_data.resize(static_cast<size_t>(w * h));
+    if (y_stride == static_cast<size_t>(w)) {
+      std::memcpy(frame.y_data.data(), y_base, frame.y_data.size());
+    } else {
+      for (int row = 0; row < h; ++row) {
+        std::memcpy(frame.y_data.data() + row * w, y_base + row * y_stride, w);
+      }
+    }
+
+    // UV プレーンをコピー
+    int uv_height = h / 2;
+    frame.u_data.resize(static_cast<size_t>(w * uv_height));
+    if (uv_stride == static_cast<size_t>(w)) {
+      std::memcpy(frame.u_data.data(), uv_base, frame.u_data.size());
+    } else {
+      for (int row = 0; row < uv_height; ++row) {
+        std::memcpy(frame.u_data.data() + row * w, uv_base + row * uv_stride, w);
+      }
     }
   }
-
-  // UV プレーンをコピー
-  int uv_height = h / 2;
-  frame.u_data.resize(static_cast<size_t>(w * uv_height));
-  if (uv_stride == static_cast<size_t>(w)) {
-    std::memcpy(frame.u_data.data(), uv_base, frame.u_data.size());
-  } else {
-    for (int row = 0; row < uv_height; ++row) {
-      std::memcpy(frame.u_data.data() + row * w, uv_base + row * uv_stride, w);
-    }
-  }
-
-  // ロック解除
-  CVPixelBufferUnlockBaseAddress(pixel_buffer, kCVPixelBufferLock_ReadOnly);
 
   std::lock_guard<std::mutex> lock(mutex_);
   last_frame_size_bytes_ =
