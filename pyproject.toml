@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.11", "nanobind>=2.9"]
+requires = ["scikit-build-core>=0.11", "nanobind>=2.10.2"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -10,11 +10,13 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 classifiers = [
+    "Programming Language :: C++",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
-    "Programming Language :: C++",
+    "Programming Language :: Python :: Free Threading :: 2 - Beta",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: Linux",
     "Operating System :: Microsoft :: Windows",
@@ -30,7 +32,6 @@ dev = [
 test = ["pytest", "pytest-timeout", "numpy"]
 example = ["numpy", "webcodecs-py", "mp4-py", "blend2d-py", "opencv-python"]
 lint = ["ruff", "ty"]
-pypi = ["auditwheel", "patchelf"]
 
 [tool.scikit-build]
 minimum-version = "0.11.3"

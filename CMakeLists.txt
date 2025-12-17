@@ -148,8 +148,9 @@ endif()
 
 # メインモジュールを作成
 nanobind_add_module(
-    _raw_player_py
+    raw_player_ext
     NB_STATIC
+    FREE_THREADED
     src/bindings/module.cpp
     src/bindings/sdl_types.cpp
     src/bindings/audio_player.cpp
@@ -157,17 +158,17 @@ nanobind_add_module(
 )
 
 # ビルド順序を保証するため依存関係を追加
-add_dependencies(_raw_player_py sdl3_build)
+add_dependencies(raw_player_ext sdl3_build)
 
 # インクルードディレクトリ
-target_include_directories(_raw_player_py PRIVATE
+target_include_directories(raw_player_ext PRIVATE
     src/bindings
     ${SDL3_INSTALL_DIR}/include
 )
 
 # ライブラリをリンク
 if(WIN32)
-    target_link_libraries(_raw_player_py PRIVATE
+    target_link_libraries(raw_player_ext PRIVATE
         "${SDL3_LIB}"
         winmm
         imm32
@@ -176,7 +177,7 @@ if(WIN32)
         cfgmgr32
     )
 elseif(APPLE)
-    target_link_libraries(_raw_player_py PRIVATE
+    target_link_libraries(raw_player_ext PRIVATE
         ${SDL3_LIB}
         "-framework AudioToolbox"
         "-framework AVFoundation"
@@ -197,7 +198,7 @@ elseif(APPLE)
     )
 else()
     # Linux
-    target_link_libraries(_raw_player_py PRIVATE
+    target_link_libraries(raw_player_ext PRIVATE
         ${SDL3_LIB}
         pthread
         dl
@@ -207,18 +208,18 @@ endif()
 
 # .pyi スタブファイルを生成
 nanobind_add_stub(
-    _raw_player_py_stub
-    MODULE _raw_player_py
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/__init__.pyi
-    PYTHON_PATH $<TARGET_FILE_DIR:_raw_player_py>
-    DEPENDS _raw_player_py
+    raw_player_ext_stub
+    MODULE raw_player_ext
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/raw_player_ext.pyi
+    PYTHON_PATH $<TARGET_FILE_DIR:raw_player_ext>
+    DEPENDS raw_player_ext
 )
 
 # モジュールをインストール
-install(TARGETS _raw_player_py LIBRARY DESTINATION raw_player)
+install(TARGETS raw_player_ext LIBRARY DESTINATION raw_player)
 
 # .pyi スタブファイルをインストール
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/__init__.pyi DESTINATION raw_player)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/raw_player_ext.pyi DESTINATION raw_player)
 
 # py.typed マーカーファイルを生成してインストール
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/py.typed "")

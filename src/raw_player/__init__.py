@@ -1,6 +1,6 @@
 """Raw audio and video playback bindings for Python."""
 
-from ._raw_player_py import (  # ty: ignore[unresolved-import]
+from .raw_player_ext import (  # ty: ignore[unresolved-import]
     # Classes
     AudioPlayer,
     VideoPlayer,

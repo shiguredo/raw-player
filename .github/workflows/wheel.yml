@@ -20,7 +20,9 @@ jobs:
             runs_on: macos-15
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
+          - "3.13t"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
@@ -33,7 +35,7 @@ jobs:
 
       # 依存ライブラリのビルドキャッシュ (SDL3)
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: _deps
           key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('**/deps.json', '**/CMakeLists.txt') }}
@@ -42,7 +44,7 @@ jobs:
 
       - run: uv build --wheel --out-dir wheelhouse
       - name: Upload Artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/*.whl
@@ -52,13 +54,19 @@ jobs:
       fail-fast: false
       matrix:
         platform:
+          - name: ubuntu-24.04_x86_64
+            runs_on: ubuntu-24.04
+          - name: ubuntu-24.04_arm64
+            runs_on: ubuntu-24.04-arm
           - name: ubuntu-22.04_x86_64
             runs_on: ubuntu-22.04
           - name: ubuntu-22.04_arm64
             runs_on: ubuntu-22.04-arm
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
+          - "3.13t"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
@@ -71,7 +79,7 @@ jobs:
 
       # 依存ライブラリのビルドキャッシュ (SDL3)
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: _deps
           key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('**/deps.json', '**/CMakeLists.txt') }}
@@ -93,12 +101,10 @@ jobs:
         env:
           SDL_VIDEODRIVER: dummy
       - name: Repair wheel with auditwheel
-        shell: bash
-        run: |
-          uv sync --group pypi
-          uv run auditwheel repair dist/*.whl --strip --only-plat
+        run: uvx auditwheel repair dist/*.whl --strip --only-plat
+
       - name: Upload Repaired Wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/*.whl
@@ -112,7 +118,9 @@ jobs:
             runs_on: windows-2025
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
+          - "3.13t"
           - "3.12"
     runs-on: ${{ matrix.platform.runs_on }}
     timeout-minutes: 30
@@ -125,7 +133,7 @@ jobs:
 
       # 依存ライブラリのビルドキャッシュ (SDL3)
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: _deps
           key: ${{ runner.os }}-deps-${{ matrix.platform.name }}-${{ hashFiles('**/deps.json', '**/CMakeLists.txt') }}
@@ -135,7 +143,7 @@ jobs:
       - name: Build wheel
         run: uv build --wheel --out-dir wheelhouse
       - name: Upload Wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.platform.name }}_python-${{ matrix.python_version }}
           path: wheelhouse/*.whl
@@ -156,7 +164,9 @@ jobs:
           - name: windows-2025_x86_64
         python_version:
           - "3.14"
+          - "3.14t"
           - "3.13"
+          - "3.13t"
           - "3.12"
     runs-on: ubuntu-24.04
     timeout-minutes: 15
