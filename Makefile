@@ -7,7 +7,7 @@ sync:
 wheel:
 	uv build --wheel
 
-develop: wheel
+develop: sync wheel
 	uv pip install -e . --force-reinstall
 	@cp _build/cp*/raw_player_ext.pyi src/raw_player/
 
