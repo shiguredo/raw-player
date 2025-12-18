@@ -313,19 +313,12 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
 void VideoPlayer::enqueue_video_yuy2(
     nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> data,
     int64_t pts_us) {
-  // 次元を検証
-  if (data.ndim() != 2) {
-    throw std::invalid_argument("YUY2 data must be 2D");
+  // YUY2: (H, W, 2) 形式を期待
+  if (data.ndim() != 3 || data.shape(2) != 2) {
+    throw std::invalid_argument("YUY2 data must be 3D (H, W, 2)");
   }
   int h = static_cast<int>(data.shape(0));
-  int packed_width = static_cast<int>(data.shape(1));
-
-  // YUY2: 2 ピクセルで 4 バイト、つまり width * 2 バイト/行
-  if (packed_width % 2 != 0) {
-    throw std::invalid_argument(
-        "YUY2 data width must be even (expected W*2 bytes per row)");
-  }
-  int w = packed_width / 2;
+  int w = static_cast<int>(data.shape(1));
 
   // Python ランタイムからデタッチ前にポインタとサイズを取得
   const uint8_t* data_ptr = data.data();
@@ -1062,7 +1055,7 @@ void init_video_player(nb::module_& m) {
                    "pts_us: int) -> None"),
            "Enqueue a YUY2 video frame.\n\n"
            "Args:\n"
-           "    data: Packed YUY2 data, uint8 (H, W*2)\n"
+           "    data: Packed YUY2 data, uint8 (H, W, 2)\n"
            "    pts_us: Presentation timestamp in microseconds")
       .def("enqueue_video_yuy2",
            static_cast<void (VideoPlayer::*)(nb::object, int64_t)>(

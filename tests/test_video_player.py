@@ -115,8 +115,8 @@ def test_enqueue_video_yuy2():
     height = 240
     width = 320
 
-    # YUY2: パックドフォーマット (H, W * 2)
-    yuy2_data = np.zeros((height, width * 2), dtype=np.uint8)
+    # YUY2: (H, W, 2) フォーマット
+    yuy2_data = np.zeros((height, width, 2), dtype=np.uint8)
 
     player.enqueue_video_yuy2(yuy2_data, pts_us=0)
 
@@ -134,12 +134,19 @@ def test_enqueue_video_yuy2_invalid_shape():
     player = raw_player.VideoPlayer(320, 240, "Test")
 
     height = 240
+    width = 320
 
-    # 不正な shape: 奇数幅は YUY2 として無効(2 ピクセルで 4 バイトのため)
-    invalid_data = np.zeros((height, 321), dtype=np.uint8)
+    # 不正な shape: 2D は受け付けない
+    invalid_data_2d = np.zeros((height, width * 2), dtype=np.uint8)
 
     with pytest.raises(Exception):
-        player.enqueue_video_yuy2(invalid_data, pts_us=0)
+        player.enqueue_video_yuy2(invalid_data_2d, pts_us=0)
+
+    # 不正な shape: 3番目の次元が 2 でない
+    invalid_data_3d = np.zeros((height, width, 3), dtype=np.uint8)
+
+    with pytest.raises(Exception):
+        player.enqueue_video_yuy2(invalid_data_3d, pts_us=0)
 
     player.close()
 

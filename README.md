@@ -151,9 +151,9 @@ import raw_player as rp
 
 player = rp.VideoPlayer(width=1920, height=1080, title="YUY2 Player")
 
-# YUY2: パックドフォーマット (H, W*2)
+# YUY2: パックドフォーマット (H, W, 2)
 # Y0 U0 Y1 V0 Y2 U1 Y3 V1 ... の形式(2 ピクセルで 4 バイト)
-yuy2_data = np.zeros((1080, 1920 * 2), dtype=np.uint8)
+yuy2_data = np.zeros((1080, 1920, 2), dtype=np.uint8)
 
 # PTS(マイクロ秒)を指定してキューに追加
 player.enqueue_video_yuy2(yuy2_data, pts_us=0)
@@ -316,7 +316,7 @@ player = VideoPlayer(width=960, height=540, title="Raw Player")
 
 #### enqueue_video_yuy2 の引数
 
-- `data`: YUY2 パックドデータ(uint8、shape: `(H, W*2)`)
+- `data`: YUY2 パックドデータ(uint8、shape: `(H, W, 2)`)
   - `Y0 U0 Y1 V0 Y2 U1 Y3 V1 ...` の形式(2 ピクセルで 4 バイト)
 - `pts_us`: PTS(マイクロ秒)
 
