@@ -60,6 +60,10 @@ class VideoPlayer {
       nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu> data,
       int64_t pts_us);
 
+  // YUY2 映像フレームをネイティブバッファからキューに追加
+  // native_buffer: PyCapsule (macOS: CVPixelBufferRef)
+  void enqueue_video_yuy2(nb::object native_buffer, int64_t pts_us);
+
   // RGBA 映像フレームをキューに追加
   // data: uint8 (H, W, 4)
   void enqueue_video_rgba(
@@ -115,17 +119,19 @@ class VideoPlayer {
     int width;           // 映像幅
     int height;          // 映像高さ
     VideoFormat format;  // フォーマット(I420/NV12/YUY2/RGBA/BGRA)
-    std::vector<uint8_t> y_data;  // I420/NV12: Y プレーン、その他: パックドデータ
-    std::vector<uint8_t> u_data;  // I420: U プレーン、NV12: UV プレーン、その他: 空
+    std::vector<uint8_t>
+        y_data;  // I420/NV12: Y プレーン、その他: パックドデータ
+    std::vector<uint8_t>
+        u_data;  // I420: U プレーン、NV12: UV プレーン、その他: 空
     std::vector<uint8_t> v_data;  // I420: V プレーン、その他: 空
   };
 
   // 音声チャンクのデータ構造
   struct AudioChunk {
-    int64_t pts_us;   // プレゼンテーションタイムスタンプ(マイクロ秒)
-    int sample_rate;  // サンプルレート
-    int channels;     // チャンネル数
-    bool is_float;    // true: float32、false: int16
+    int64_t pts_us;             // プレゼンテーションタイムスタンプ(マイクロ秒)
+    int sample_rate;            // サンプルレート
+    int channels;               // チャンネル数
+    bool is_float;              // true: float32、false: int16
     std::vector<uint8_t> data;  // PCM データ
   };
 
@@ -161,7 +167,7 @@ class VideoPlayer {
 
   // 映像のみモード用のタイミング
   uint64_t video_start_time_ns_ =
-      0;  // 映像再生開始時のウォールクロック(ナノ秒)
+      0;                             // 映像再生開始時のウォールクロック(ナノ秒)
   int64_t first_video_pts_us_ = 0;   // 最初の映像フレームの PTS
   bool video_only_started_ = false;  // 映像のみモードが開始されたか
 

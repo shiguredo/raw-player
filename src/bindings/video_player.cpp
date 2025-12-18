@@ -234,8 +234,7 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
         "native_buffer must be a PyCapsule with name 'CVPixelBufferRef'");
   }
 
-  CVPixelBufferRef pixel_buffer =
-      static_cast<CVPixelBufferRef>(capsule.data());
+  CVPixelBufferRef pixel_buffer = static_cast<CVPixelBufferRef>(capsule.data());
   if (pixel_buffer == nullptr) {
     throw std::invalid_argument("native_buffer contains null pointer");
   }
@@ -293,7 +292,8 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
       std::memcpy(frame.u_data.data(), uv_base, frame.u_data.size());
     } else {
       for (int row = 0; row < uv_height; ++row) {
-        std::memcpy(frame.u_data.data() + row * w, uv_base + row * uv_stride, w);
+        std::memcpy(frame.u_data.data() + row * w, uv_base + row * uv_stride,
+                    w);
       }
     }
 
@@ -306,8 +306,7 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
 #else
   (void)native_buffer;
   (void)pts_us;
-  throw std::runtime_error(
-      "native_buffer is only supported on macOS");
+  throw std::runtime_error("native_buffer is only supported on macOS");
 #endif
 }
 
@@ -350,6 +349,81 @@ void VideoPlayer::enqueue_video_yuy2(
     total_frames_enqueued_++;
     video_queue_.push_back(std::move(frame));
   }
+}
+
+void VideoPlayer::enqueue_video_yuy2(nb::object native_buffer, int64_t pts_us) {
+#ifdef __APPLE__
+  // PyCapsule から CVPixelBufferRef を取得
+  if (!nb::isinstance<nb::capsule>(native_buffer)) {
+    throw std::invalid_argument(
+        "native_buffer must be a PyCapsule containing CVPixelBufferRef");
+  }
+
+  nb::capsule capsule = nb::cast<nb::capsule>(native_buffer);
+  const char* name = capsule.name();
+  if (name == nullptr || std::strcmp(name, "CVPixelBufferRef") != 0) {
+    throw std::invalid_argument(
+        "native_buffer must be a PyCapsule with name 'CVPixelBufferRef'");
+  }
+
+  CVPixelBufferRef pixel_buffer = static_cast<CVPixelBufferRef>(capsule.data());
+  if (pixel_buffer == nullptr) {
+    throw std::invalid_argument("native_buffer contains null pointer");
+  }
+
+  // ピクセルフォーマットを確認
+  OSType pixel_format = CVPixelBufferGetPixelFormatType(pixel_buffer);
+  if (pixel_format != kCVPixelFormatType_422YpCbCr8_yuvs) {
+    throw std::invalid_argument(
+        "native_buffer must contain YUY2 format CVPixelBuffer");
+  }
+
+  // サイズを取得
+  int w = static_cast<int>(CVPixelBufferGetWidth(pixel_buffer));
+  int h = static_cast<int>(CVPixelBufferGetHeight(pixel_buffer));
+
+  VideoFrame frame;
+  frame.pts_us = pts_us;
+  frame.width = w;
+  frame.height = h;
+  frame.format = VideoFormat::YUY2;
+
+  // Python ランタイムからデタッチしてデータコピー
+  // CVPixelBufferRef はネイティブポインタなのでデタッチ後も安全に使用可能
+  {
+    nb::gil_scoped_release release;
+
+    // RAII ガードでロック/アンロックを管理
+    CVPixelBufferLockGuard lock_guard(pixel_buffer);
+
+    // YUY2 はパックドフォーマットなので単一プレーン
+    uint8_t* base =
+        static_cast<uint8_t*>(CVPixelBufferGetBaseAddress(pixel_buffer));
+    size_t stride = CVPixelBufferGetBytesPerRow(pixel_buffer);
+
+    // YUY2: 2 ピクセルで 4 バイト、つまり width * 2 バイト/行
+    int row_bytes = w * 2;
+    frame.y_data.resize(static_cast<size_t>(row_bytes * h));
+
+    if (stride == static_cast<size_t>(row_bytes)) {
+      std::memcpy(frame.y_data.data(), base, frame.y_data.size());
+    } else {
+      for (int row = 0; row < h; ++row) {
+        std::memcpy(frame.y_data.data() + row * row_bytes, base + row * stride,
+                    row_bytes);
+      }
+    }
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
+    total_frames_enqueued_++;
+    video_queue_.push_back(std::move(frame));
+  }
+#else
+  (void)native_buffer;
+  (void)pts_us;
+  throw std::runtime_error("native_buffer is only supported on macOS");
+#endif
 }
 
 void VideoPlayer::enqueue_video_rgba(
@@ -955,39 +1029,50 @@ void init_video_player(nb::module_& m) {
            "    v: V plane, uint8 (H/2, W/2)\n"
            "    pts_us: Presentation timestamp in microseconds")
 
-      .def(
-          "enqueue_video_nv12",
-          static_cast<void (VideoPlayer::*)(
-              nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu>,
-              nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu>, int64_t)>(
-              &VideoPlayer::enqueue_video_nv12),
-          nb::arg("y"), nb::arg("uv"), nb::arg("pts_us"),
-          nb::sig("def enqueue_video_nv12(self, y: numpy.ndarray, "
-                  "uv: numpy.ndarray, pts_us: int) -> None"),
-          "Enqueue an NV12 video frame.\n\n"
-          "Args:\n"
-          "    y: Y plane, uint8 (H, W)\n"
-          "    uv: UV plane, uint8 (H/2, W)\n"
-          "    pts_us: Presentation timestamp in microseconds")
-      .def(
-          "enqueue_video_nv12",
-          static_cast<void (VideoPlayer::*)(nb::object, int64_t)>(
-              &VideoPlayer::enqueue_video_nv12),
-          nb::arg("native_buffer"), nb::arg("pts_us"),
-          nb::sig("def enqueue_video_nv12(self, native_buffer: object, "
-                  "pts_us: int) -> None"),
-          "Enqueue an NV12 video frame from native buffer.\n\n"
-          "Args:\n"
-          "    native_buffer: PyCapsule containing CVPixelBufferRef (macOS)\n"
-          "    pts_us: Presentation timestamp in microseconds")
+      .def("enqueue_video_nv12",
+           static_cast<void (VideoPlayer::*)(
+               nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu>,
+               nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu>, int64_t)>(
+               &VideoPlayer::enqueue_video_nv12),
+           nb::arg("y"), nb::arg("uv"), nb::arg("pts_us"),
+           nb::sig("def enqueue_video_nv12(self, y: numpy.ndarray, "
+                   "uv: numpy.ndarray, pts_us: int) -> None"),
+           "Enqueue an NV12 video frame.\n\n"
+           "Args:\n"
+           "    y: Y plane, uint8 (H, W)\n"
+           "    uv: UV plane, uint8 (H/2, W)\n"
+           "    pts_us: Presentation timestamp in microseconds")
+      .def("enqueue_video_nv12",
+           static_cast<void (VideoPlayer::*)(nb::object, int64_t)>(
+               &VideoPlayer::enqueue_video_nv12),
+           nb::arg("native_buffer"), nb::arg("pts_us"),
+           nb::sig("def enqueue_video_nv12(self, native_buffer: object, "
+                   "pts_us: int) -> None"),
+           "Enqueue an NV12 video frame from native buffer.\n\n"
+           "Args:\n"
+           "    native_buffer: PyCapsule containing CVPixelBufferRef (macOS)\n"
+           "    pts_us: Presentation timestamp in microseconds")
 
-      .def("enqueue_video_yuy2", &VideoPlayer::enqueue_video_yuy2,
+      .def("enqueue_video_yuy2",
+           static_cast<void (VideoPlayer::*)(
+               nb::ndarray<uint8_t, nb::c_contig, nb::device::cpu>, int64_t)>(
+               &VideoPlayer::enqueue_video_yuy2),
            nb::arg("data"), nb::arg("pts_us"),
            nb::sig("def enqueue_video_yuy2(self, data: numpy.ndarray, "
                    "pts_us: int) -> None"),
            "Enqueue a YUY2 video frame.\n\n"
            "Args:\n"
            "    data: Packed YUY2 data, uint8 (H, W*2)\n"
+           "    pts_us: Presentation timestamp in microseconds")
+      .def("enqueue_video_yuy2",
+           static_cast<void (VideoPlayer::*)(nb::object, int64_t)>(
+               &VideoPlayer::enqueue_video_yuy2),
+           nb::arg("native_buffer"), nb::arg("pts_us"),
+           nb::sig("def enqueue_video_yuy2(self, native_buffer: object, "
+                   "pts_us: int) -> None"),
+           "Enqueue a YUY2 video frame from native buffer.\n\n"
+           "Args:\n"
+           "    native_buffer: PyCapsule containing CVPixelBufferRef (macOS)\n"
            "    pts_us: Presentation timestamp in microseconds")
 
       .def("enqueue_video_rgba", &VideoPlayer::enqueue_video_rgba,
@@ -1048,7 +1133,8 @@ void init_video_player(nb::module_& m) {
                    nb::sig("def height(self) -> int"), "Window height.")
       .def_prop_rw("title", &VideoPlayer::title, &VideoPlayer::set_title,
                    nb::sig("def title(self) -> str"),
-                   nb::sig("def title(self, value: str) -> None"), "Window title.")
+                   nb::sig("def title(self, value: str) -> None"),
+                   "Window title.")
       .def_prop_ro("renderer_name", &VideoPlayer::renderer_name,
                    nb::sig("def renderer_name(self) -> str"),
                    "GPU renderer name (e.g., 'metal', 'vulkan').")

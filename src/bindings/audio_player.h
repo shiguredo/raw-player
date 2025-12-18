@@ -44,10 +44,10 @@ class AudioPlayer {
  private:
   // 音声チャンクのデータ構造
   struct AudioChunk {
-    int64_t pts_us;   // プレゼンテーションタイムスタンプ(マイクロ秒)
-    int sample_rate;  // サンプルレート
-    int channels;     // チャンネル数
-    bool is_float;    // true: float32、false: int16
+    int64_t pts_us;             // プレゼンテーションタイムスタンプ(マイクロ秒)
+    int sample_rate;            // サンプルレート
+    int channels;               // チャンネル数
+    bool is_float;              // true: float32、false: int16
     std::vector<uint8_t> data;  // PCM データ
   };
 
