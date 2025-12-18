@@ -170,6 +170,15 @@ void VideoPlayer::enqueue_video_i420(
     last_frame_size_bytes_ = static_cast<int64_t>(
         frame.y_data.size() + frame.u_data.size() + frame.v_data.size());
     total_frames_enqueued_++;
+
+    // キューサイズ制限を適用
+    if (max_video_queue_size_ > 0) {
+      while (video_queue_.size() >= max_video_queue_size_) {
+        video_queue_.pop_front();
+        dropped_frames_++;
+      }
+    }
+
     video_queue_.push_back(std::move(frame));
   }
 }
@@ -215,6 +224,15 @@ void VideoPlayer::enqueue_video_nv12(
     last_frame_size_bytes_ =
         static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
     total_frames_enqueued_++;
+
+    // キューサイズ制限を適用
+    if (max_video_queue_size_ > 0) {
+      while (video_queue_.size() >= max_video_queue_size_) {
+        video_queue_.pop_front();
+        dropped_frames_++;
+      }
+    }
+
     video_queue_.push_back(std::move(frame));
   }
 }
@@ -301,6 +319,15 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
     last_frame_size_bytes_ =
         static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
     total_frames_enqueued_++;
+
+    // キューサイズ制限を適用
+    if (max_video_queue_size_ > 0) {
+      while (video_queue_.size() >= max_video_queue_size_) {
+        video_queue_.pop_front();
+        dropped_frames_++;
+      }
+    }
+
     video_queue_.push_back(std::move(frame));
   }
 #else
@@ -340,6 +367,15 @@ void VideoPlayer::enqueue_video_yuy2(
     std::lock_guard<std::mutex> lock(mutex_);
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
     total_frames_enqueued_++;
+
+    // キューサイズ制限を適用
+    if (max_video_queue_size_ > 0) {
+      while (video_queue_.size() >= max_video_queue_size_) {
+        video_queue_.pop_front();
+        dropped_frames_++;
+      }
+    }
+
     video_queue_.push_back(std::move(frame));
   }
 }
@@ -410,6 +446,15 @@ void VideoPlayer::enqueue_video_yuy2(nb::object native_buffer, int64_t pts_us) {
     std::lock_guard<std::mutex> lock(mutex_);
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
     total_frames_enqueued_++;
+
+    // キューサイズ制限を適用
+    if (max_video_queue_size_ > 0) {
+      while (video_queue_.size() >= max_video_queue_size_) {
+        video_queue_.pop_front();
+        dropped_frames_++;
+      }
+    }
+
     video_queue_.push_back(std::move(frame));
   }
 #else
@@ -454,6 +499,15 @@ void VideoPlayer::enqueue_video_rgba(
     std::lock_guard<std::mutex> lock(mutex_);
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
     total_frames_enqueued_++;
+
+    // キューサイズ制限を適用
+    if (max_video_queue_size_ > 0) {
+      while (video_queue_.size() >= max_video_queue_size_) {
+        video_queue_.pop_front();
+        dropped_frames_++;
+      }
+    }
+
     video_queue_.push_back(std::move(frame));
   }
 }
@@ -493,6 +547,15 @@ void VideoPlayer::enqueue_video_bgra(
     std::lock_guard<std::mutex> lock(mutex_);
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
     total_frames_enqueued_++;
+
+    // キューサイズ制限を適用
+    if (max_video_queue_size_ > 0) {
+      while (video_queue_.size() >= max_video_queue_size_) {
+        video_queue_.pop_front();
+        dropped_frames_++;
+      }
+    }
+
     video_queue_.push_back(std::move(frame));
   }
 }
@@ -996,6 +1059,26 @@ nb::dict VideoPlayer::stats() const {
   return result;
 }
 
+void VideoPlayer::set_max_video_queue_size(size_t size) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  max_video_queue_size_ = size;
+}
+
+size_t VideoPlayer::get_max_video_queue_size() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return max_video_queue_size_;
+}
+
+void VideoPlayer::drain_video() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  video_queue_.clear();
+
+  // 映像のみモードのタイミングをリセット
+  video_start_time_ns_ = 0;
+  first_video_pts_us_ = 0;
+  video_only_started_ = false;
+}
+
 // === Python バインディング ===
 
 void init_video_player(nb::module_& m) {
@@ -1171,5 +1254,20 @@ void init_video_player(nb::module_& m) {
            "        - total_frames_rendered: Total frames rendered\n"
            "        - video_buffer_ms: Video buffer time in milliseconds\n"
            "        - elapsed_time_ms: Elapsed time in milliseconds\n"
-           "        - video_bitrate_kbps: Video bitrate in kbps");
+           "        - video_bitrate_kbps: Video bitrate in kbps")
+
+      // キューサイズ制御
+      .def_prop_rw(
+          "max_video_queue_size", &VideoPlayer::get_max_video_queue_size,
+          &VideoPlayer::set_max_video_queue_size,
+          nb::sig("def max_video_queue_size(self) -> int"),
+          nb::sig("def max_video_queue_size(self, value: int) -> None"),
+          "Maximum video queue size.\n\n"
+          "When enqueue_video_* is called and the queue size exceeds this limit,\n"
+          "older frames are dropped to maintain low latency.\n"
+          "Set to 0 to disable the limit (default: 5).")
+      .def("drain_video", &VideoPlayer::drain_video,
+           nb::sig("def drain_video(self) -> None"),
+           "Clear the video queue and reset timing.\n\n"
+           "Use this to recover from accumulated latency.");
 }

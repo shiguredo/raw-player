@@ -112,6 +112,11 @@ class VideoPlayer {
   // === 統計情報 ===
   nb::dict stats() const;
 
+  // === キューサイズ制御 ===
+  void set_max_video_queue_size(size_t size);
+  size_t get_max_video_queue_size() const;
+  void drain_video();
+
  private:
   // 映像フレームのデータ構造
   struct VideoFrame {
@@ -173,6 +178,10 @@ class VideoPlayer {
 
   // 同期設定
   int64_t sync_threshold_us_ = 40000;  // 40ms の許容誤差
+
+  // キューサイズ制限
+  // 0 の場合は制限なし
+  size_t max_video_queue_size_ = 5;
 
   // 統計情報
   int dropped_frames_ = 0;   // ドロップしたフレーム数

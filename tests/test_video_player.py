@@ -265,3 +265,106 @@ def test_video_player_properties():
 
     player.close()
     assert player.is_open is False
+
+
+def test_max_video_queue_size_default():
+    """max_video_queue_size のデフォルト値が 5 であることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    assert player.max_video_queue_size == 5
+
+    player.close()
+
+
+def test_max_video_queue_size_setter():
+    """max_video_queue_size を設定できることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    player.max_video_queue_size = 10
+    assert player.max_video_queue_size == 10
+
+    player.max_video_queue_size = 3
+    assert player.max_video_queue_size == 3
+
+    player.close()
+
+
+def test_max_video_queue_size_drops_old_frames():
+    """キューサイズ上限を超えたときに古いフレームがドロップされることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+    player.max_video_queue_size = 3
+
+    height = 240
+    width = 320
+
+    y_plane = np.zeros((height, width), dtype=np.uint8)
+    u_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+    v_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+
+    for i in range(5):
+        player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us=i * 33333)
+
+    stats = player.stats()
+    assert stats["video_queue_size"] == 3
+    assert stats["total_frames_enqueued"] == 5
+    assert stats["dropped_frames"] == 2
+
+    player.close()
+
+
+def test_max_video_queue_size_zero_disables_limit():
+    """max_video_queue_size が 0 の場合は制限なしになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+    player.max_video_queue_size = 0
+
+    height = 240
+    width = 320
+
+    y_plane = np.zeros((height, width), dtype=np.uint8)
+    u_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+    v_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+
+    for i in range(10):
+        player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us=i * 33333)
+
+    stats = player.stats()
+    assert stats["video_queue_size"] == 10
+    assert stats["total_frames_enqueued"] == 10
+    assert stats["dropped_frames"] == 0
+
+    player.close()
+
+
+def test_drain_video():
+    """drain_video() でキューがクリアされることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    height = 240
+    width = 320
+
+    y_plane = np.zeros((height, width), dtype=np.uint8)
+    u_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+    v_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+
+    for i in range(5):
+        player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us=i * 33333)
+
+    stats = player.stats()
+    assert stats["video_queue_size"] == 5
+
+    player.drain_video()
+
+    stats = player.stats()
+    assert stats["video_queue_size"] == 0
+
+    player.close()
