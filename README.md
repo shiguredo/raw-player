@@ -32,6 +32,7 @@ PCM / I420 / NV12 / YUY2 / RGBA / BGRA データを PTS (Presentation Timestamp)
 
 - 生の音声/映像入力データをそのまま再生できる
 - 入力データに [numpy.ndarray](https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html) を採用
+- PyCapsule 経由で CVPixelBuffer を直接受け取るネイティブバッファー対応 (macOS)
 - 音声フォーマットは PCM (int16 / float32) に対応
 - 映像フォーマットは I420 (YUV420P) / NV12 / YUY2 / RGBA / BGRA に対応
 - PTS ベース音声をマスタークロックとした映像同期機能
