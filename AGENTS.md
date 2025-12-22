@@ -116,14 +116,6 @@
 - class を使わないこと
 - lambda は使わないで def を使うこと
 
-### ベンチマーク
-
-- ベンチマークは `tests/benchmarks/` 以下に配置すること
-- ベンチマークファイルは `bench_` prefix を持つファイルのみが実行される
-- 通常の pytest 実行時はベンチマークは無効化されている (`--benchmark-disable`)
-- ベンチマークを実行するには `--benchmark-enable` オプションで有効化する
-  - `NO_UV_SYNC=1 APPLE_VIDEO_TOOLBOX=1 uv run pytest tests/benchmarks/ --benchmark-enable`
-
 ## ドキュメント
 
 - ドキュメントは Audio 、 Video の順番で記載すること
