@@ -1,6 +1,6 @@
 """カメラ映像テスト
 
-OpenCV でカメラ映像を取得し、
+uvc-py でカメラ映像を取得し、
 webcodecs-py でエンコード/デコードして、
 raw-player で表示します。
 """
@@ -9,8 +9,8 @@ import argparse
 import time
 from collections import deque
 
-import cv2
 import numpy as np
+import uvc
 from webcodecs import (
     EncodedVideoChunk,
     HardwareAccelerationEngine,
@@ -28,90 +28,6 @@ from raw_player import VideoPlayer, get_gpu_driver, get_version
 DEFAULT_WIDTH = 1280
 DEFAULT_HEIGHT = 720
 DEFAULT_FPS = 30
-
-
-def bgr_to_i420_planes(
-    bgr: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    BGR (H, W, 3) を I420 の Y, U, V プレーンに変換
-
-    戻り値:
-        (Y, U, V) プレーンのタプル
-        Y: (H, W), U: (H/2, W/2), V: (H/2, W/2)
-    """
-    height, width = bgr.shape[:2]
-    # OpenCV の cvtColor で BGR -> YUV_I420 に変換
-    i420 = cv2.cvtColor(bgr, cv2.COLOR_BGR2YUV_I420)
-
-    # I420 レイアウト: Y (H, W) + U (H/2, W/2) + V (H/2, W/2)
-    y_size = width * height
-    uv_size = (width // 2) * (height // 2)
-
-    y_plane = i420[:height, :].reshape(height, width)
-    u_plane = i420.flatten()[y_size : y_size + uv_size].reshape(height // 2, width // 2)
-    v_plane = i420.flatten()[y_size + uv_size :].reshape(height // 2, width // 2)
-
-    return y_plane, u_plane, v_plane
-
-
-def draw_overlay(
-    bgr_frame: np.ndarray,
-    frame_number: int,
-    width: int,
-    height: int,
-    fps: int,
-    actual_fps: float,
-    codec_type: str,
-) -> np.ndarray:
-    """
-    フレームにオーバーレイ情報を描画 (OpenCV)
-
-    Args:
-        bgr_frame: BGR フレーム
-        frame_number: フレーム番号
-        width: 映像幅
-        height: 映像高さ
-        fps: 目標 FPS
-        actual_fps: 実際の FPS
-        codec_type: コーデック種別
-
-    戻り値:
-        オーバーレイが描画された BGR フレーム
-    """
-    # フォント設定
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 0.7
-    thickness = 2
-    color = (255, 255, 255)  # 白
-    shadow_color = (0, 0, 0)  # 黒(影用)
-
-    # 表示するテキスト
-    lines = [
-        f"{width}x{height} | {fps} FPS | {codec_type}",
-        f"BGR -> I420 -> YUV420P",
-        f"Frame: {frame_number:06d}",
-        f"FPS: {actual_fps:.1f}",
-    ]
-
-    # テキストを描画
-    y_offset = 30
-    for line in lines:
-        # 影を描画(読みやすくするため)
-        cv2.putText(
-            bgr_frame,
-            line,
-            (12, y_offset + 2),
-            font,
-            font_scale,
-            shadow_color,
-            thickness + 1,
-        )
-        # テキストを描画
-        cv2.putText(bgr_frame, line, (10, y_offset), font, font_scale, color, thickness)
-        y_offset += 30
-
-    return bgr_frame
 
 
 def main():
@@ -152,7 +68,7 @@ def main():
         type=str,
         default=None,
         choices=["AV1", "H264", "H265", "VP8", "VP9"],
-        help="ビデオコーデック。指定しない場合は生データ(I420)を直接表示",
+        help="ビデオコーデック。指定しない場合は生データ(NV12)を直接表示",
     )
     parser.add_argument(
         "--video-bitrate",
@@ -170,10 +86,20 @@ def main():
         action="store_true",
         help="映像を上下反転",
     )
+    parser.add_argument(
+        "--native-buffer",
+        action="store_true",
+        help="ネイティブバッファを使用 (macOS のみ)",
+    )
     args = parser.parse_args()
 
     # コーデック使用の有無
     use_codec = args.video_codec_type is not None
+
+    # native_buffer と flip は併用不可
+    if args.native_buffer and (args.flip_horizontal or args.flip_vertical):
+        print("エラー: --native-buffer と --flip-* オプションは併用できません")
+        return
 
     # コーデック設定
     codec_string = None
@@ -207,32 +133,32 @@ def main():
         print(f"Codec: {args.video_codec_type} ({codec_string})")
         print(f"Bitrate: {args.video_bitrate} kbps")
     else:
-        print("Codec: None (生データ I420)")
+        print("Codec: None (生データ NV12)")
+    if args.native_buffer:
+        print("Native Buffer: 有効")
     print(f"Duration: {args.duration}s ({total_frames} frames)")
     print()
 
+    # デバイス一覧を表示
+    devices = uvc.list_devices()
+    print(f"利用可能なデバイス: {len(devices)}")
+    for device in devices:
+        print(f"  [{device.index}] {device.name}")
+    print()
+
     # カメラを開く
-    cap = cv2.VideoCapture(args.camera)
-    if not cap.isOpened():
-        print(f"エラー: カメラ {args.camera} を開けませんでした")
+    try:
+        device = uvc.open(args.camera)
+    except RuntimeError as e:
+        print(f"エラー: カメラ {args.camera} を開けませんでした: {e}")
         return
 
-    # カメラの解像度を設定
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-    cap.set(cv2.CAP_PROP_FPS, fps)
+    # キャプチャ開始
+    device.start(width, height, fps, capture_format=uvc.Format.NV12)
 
     # 実際の解像度を取得
-    actual_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    actual_fps = cap.get(cv2.CAP_PROP_FPS)
-
-    print(f"カメラ実際の解像度: {actual_width}x{actual_height}")
-    print(f"カメラ実際の FPS: {actual_fps}")
-
-    # 実際の解像度を使用
-    width = actual_width
-    height = actual_height
+    print(f"カメラ解像度: {width}x{height}")
+    print(f"カメラ FPS: {fps}")
     print()
 
     # エンコード済みチャンクとデコード済みフレームのキュー
@@ -335,13 +261,12 @@ def main():
 
     # 統計用
     capture_times: list[float] = []
-    overlay_times: list[float] = []
     encode_times: list[float] = []
     decode_times: list[float] = []
     enqueue_times: list[float] = []
 
     # フレームサイズ統計用
-    raw_frame_sizes: list[int] = []  # 生データ (I420)
+    raw_frame_sizes: list[int] = []  # 生データ (NV12)
     encoded_frame_sizes: list[int] = []  # エンコード後
     decoded_frame_sizes: list[int] = []  # デコード後
 
@@ -353,110 +278,165 @@ def main():
 
             # カメラからフレームを取得
             capture_start = time.perf_counter()
-            ret, bgr_frame = cap.read()
-            if not ret:
-                print("カメラからフレームを取得できませんでした")
-                break
+            uvc_frame = device.get_frame()
+            if uvc_frame is None:
+                continue
             capture_time = time.perf_counter() - capture_start
             capture_times.append(capture_time)
 
-            # 反転処理
-            if args.flip_horizontal and args.flip_vertical:
-                bgr_frame = cv2.flip(bgr_frame, -1)
-            elif args.flip_horizontal:
-                bgr_frame = cv2.flip(bgr_frame, 1)
-            elif args.flip_vertical:
-                bgr_frame = cv2.flip(bgr_frame, 0)
+            timestamp_us = uvc_frame.timestamp
 
-            # 現在の FPS を計算
-            total_elapsed = time.perf_counter() - start_time
-            current_fps = frame_number / total_elapsed if total_elapsed > 0 else 0
+            # native_buffer モード
+            if args.native_buffer:
+                native_buf = uvc_frame.native_buffer()
+                if native_buf is None:
+                    print("警告: native_buffer が None です (macOS 以外では使用不可)")
+                    continue
 
-            # OpenCV でオーバーレイを描画
-            overlay_start = time.perf_counter()
-            bgr_frame = draw_overlay(
-                bgr_frame,
-                frame_number,
-                width,
-                height,
-                fps,
-                current_fps,
-                args.video_codec_type,
-            )
-            overlay_time = time.perf_counter() - overlay_start
-            overlay_times.append(overlay_time)
-
-            # BGR → I420 変換(プレーン分離)
-            y_raw, u_raw, v_raw = bgr_to_i420_planes(bgr_frame)
-            raw_frame_sizes.append(y_raw.nbytes + u_raw.nbytes + v_raw.nbytes)
-
-            timestamp_us = int(frame_number * 1_000_000 / fps)
-
-            if use_codec:
-                # VideoFrame を作成(エンコード用、1 次元 I420)
-                i420_data = np.concatenate(
-                    [y_raw.flatten(), u_raw.flatten(), v_raw.flatten()]
-                )
-                video_frame = VideoFrame(
-                    i420_data,
-                    {
-                        "format": VideoPixelFormat.I420,
-                        "coded_width": width,
-                        "coded_height": height,
-                        "timestamp": timestamp_us,
-                    },
-                )
-
-                # エンコード
-                encode_start = time.perf_counter()
-                is_key_frame = frame_number % (fps * 2) == 0  # 2秒ごとにキーフレーム
-                assert encoder is not None
-                encoder.encode(video_frame, {"key_frame": is_key_frame})
-                video_frame.close()
-                encode_time = time.perf_counter() - encode_start
-                encode_times.append(encode_time)
-
-                # エンコードされたチャンクをデコード
-                decode_start = time.perf_counter()
-                assert decoder is not None
-                while encoded_chunks:
-                    chunk = encoded_chunks.popleft()
-                    encoded_frame_sizes.append(chunk.byte_length)
-                    # デコーダが設定されている場合のみデコード
-                    if decoder_configured:
-                        decoder.decode(chunk)
-                decode_time = time.perf_counter() - decode_start
-                decode_times.append(decode_time)
-
-                # デコードされたフレームを enqueue
-                enqueue_start = time.perf_counter()
-                while decoded_frames:
-                    decoded_frame = decoded_frames.popleft()
-                    # デコーダは I420 (Y, U, V) で出力
-                    y_plane, u_plane, v_plane = decoded_frame.planes()
-                    decoded_frame_sizes.append(
-                        y_plane.nbytes + u_plane.nbytes + v_plane.nbytes
+                if use_codec:
+                    # VideoFrame を作成(エンコード用、native_buffer)
+                    video_frame = VideoFrame(
+                        native_buf,
+                        {
+                            "format": VideoPixelFormat.NV12,
+                            "coded_width": width,
+                            "coded_height": height,
+                            "timestamp": timestamp_us,
+                        },
                     )
-                    pts_us = decoded_frame.timestamp
-                    player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us)
-                    decoded_frame.close()
+
+                    # エンコード
+                    encode_start = time.perf_counter()
+                    is_key_frame = frame_number % (fps * 2) == 0
+                    assert encoder is not None
+                    encoder.encode(video_frame, {"key_frame": is_key_frame})
+                    video_frame.close()
+                    encode_time = time.perf_counter() - encode_start
+                    encode_times.append(encode_time)
+
+                    # エンコードされたチャンクをデコード
+                    decode_start = time.perf_counter()
+                    assert decoder is not None
+                    while encoded_chunks:
+                        chunk = encoded_chunks.popleft()
+                        encoded_frame_sizes.append(chunk.byte_length)
+                        if decoder_configured:
+                            decoder.decode(chunk)
+                    decode_time = time.perf_counter() - decode_start
+                    decode_times.append(decode_time)
+
+                    # デコードされたフレームを enqueue
+                    enqueue_start = time.perf_counter()
+                    while decoded_frames:
+                        decoded_frame = decoded_frames.popleft()
+                        if decoded_frame.format == VideoPixelFormat.NV12:
+                            y_data = decoded_frame.plane(0)
+                            uv_data = decoded_frame.plane(1)
+                            decoded_frame_sizes.append(y_data.nbytes + uv_data.nbytes)
+                            pts_us = decoded_frame.timestamp
+                            player.enqueue_video_nv12(y_data, uv_data, pts_us)
+                        else:
+                            y_data, u_data, v_data = decoded_frame.planes()
+                            decoded_frame_sizes.append(
+                                y_data.nbytes + u_data.nbytes + v_data.nbytes
+                            )
+                            pts_us = decoded_frame.timestamp
+                            player.enqueue_video_i420(y_data, u_data, v_data, pts_us)
+                        decoded_frame.close()
+                        rendered_frames += 1
+                    enqueue_time = time.perf_counter() - enqueue_start
+                    enqueue_times.append(enqueue_time)
+                else:
+                    # 生データモード: native_buffer を直接 enqueue
+                    enqueue_start = time.perf_counter()
+                    player.enqueue_video_nv12(native_buf, timestamp_us)
                     rendered_frames += 1
-                enqueue_time = time.perf_counter() - enqueue_start
-                enqueue_times.append(enqueue_time)
+                    enqueue_time = time.perf_counter() - enqueue_start
+                    enqueue_times.append(enqueue_time)
             else:
-                # 生データモード: 直接 enqueue
-                enqueue_start = time.perf_counter()
-                player.enqueue_video_i420(y_raw, u_raw, v_raw, timestamp_us)
-                rendered_frames += 1
-                enqueue_time = time.perf_counter() - enqueue_start
-                enqueue_times.append(enqueue_time)
+                # numpy 配列モード
+                y_plane, uv_plane = uvc_frame.to_nv12()
+
+                # 反転処理
+                if args.flip_horizontal and args.flip_vertical:
+                    y_plane = np.flip(y_plane, axis=(0, 1)).copy()
+                    uv_plane = np.flip(uv_plane, axis=(0, 1)).copy()
+                elif args.flip_horizontal:
+                    y_plane = np.flip(y_plane, axis=1).copy()
+                    uv_plane = np.flip(uv_plane, axis=1).copy()
+                elif args.flip_vertical:
+                    y_plane = np.flip(y_plane, axis=0).copy()
+                    uv_plane = np.flip(uv_plane, axis=0).copy()
+
+                raw_frame_sizes.append(y_plane.nbytes + uv_plane.nbytes)
+
+                if use_codec:
+                    # VideoFrame を作成(エンコード用、NV12)
+                    video_frame = VideoFrame(
+                        y_plane,
+                        uv_plane,
+                        {
+                            "format": VideoPixelFormat.NV12,
+                            "coded_width": width,
+                            "coded_height": height,
+                            "timestamp": timestamp_us,
+                        },
+                    )
+
+                    # エンコード
+                    encode_start = time.perf_counter()
+                    is_key_frame = frame_number % (fps * 2) == 0
+                    assert encoder is not None
+                    encoder.encode(video_frame, {"key_frame": is_key_frame})
+                    video_frame.close()
+                    encode_time = time.perf_counter() - encode_start
+                    encode_times.append(encode_time)
+
+                    # エンコードされたチャンクをデコード
+                    decode_start = time.perf_counter()
+                    assert decoder is not None
+                    while encoded_chunks:
+                        chunk = encoded_chunks.popleft()
+                        encoded_frame_sizes.append(chunk.byte_length)
+                        if decoder_configured:
+                            decoder.decode(chunk)
+                    decode_time = time.perf_counter() - decode_start
+                    decode_times.append(decode_time)
+
+                    # デコードされたフレームを enqueue
+                    enqueue_start = time.perf_counter()
+                    while decoded_frames:
+                        decoded_frame = decoded_frames.popleft()
+                        if decoded_frame.format == VideoPixelFormat.NV12:
+                            y_data = decoded_frame.plane(0)
+                            uv_data = decoded_frame.plane(1)
+                            decoded_frame_sizes.append(y_data.nbytes + uv_data.nbytes)
+                            pts_us = decoded_frame.timestamp
+                            player.enqueue_video_nv12(y_data, uv_data, pts_us)
+                        else:
+                            y_data, u_data, v_data = decoded_frame.planes()
+                            decoded_frame_sizes.append(
+                                y_data.nbytes + u_data.nbytes + v_data.nbytes
+                            )
+                            pts_us = decoded_frame.timestamp
+                            player.enqueue_video_i420(y_data, u_data, v_data, pts_us)
+                        decoded_frame.close()
+                        rendered_frames += 1
+                    enqueue_time = time.perf_counter() - enqueue_start
+                    enqueue_times.append(enqueue_time)
+                else:
+                    # 生データモード: 直接 enqueue
+                    enqueue_start = time.perf_counter()
+                    player.enqueue_video_nv12(y_plane, uv_plane, timestamp_us)
+                    rendered_frames += 1
+                    enqueue_time = time.perf_counter() - enqueue_start
+                    enqueue_times.append(enqueue_time)
 
             frame_number += 1
 
             # 30 フレームごとに統計を表示
             if frame_number % 30 == 0:
                 avg_capture = sum(capture_times[-30:]) / min(30, len(capture_times))
-                avg_overlay = sum(overlay_times[-30:]) / min(30, len(overlay_times))
                 avg_enqueue = sum(enqueue_times[-30:]) / min(30, len(enqueue_times))
                 total_elapsed = time.perf_counter() - start_time
                 actual_fps = frame_number / total_elapsed
@@ -466,19 +446,17 @@ def main():
                     print(
                         f"Frame {frame_number}/{total_frames}: "
                         f"FPS={actual_fps:.1f}, "
-                        f"capture={avg_capture * 1000:.1f}ms, "
-                        f"overlay={avg_overlay * 1000:.1f}ms, "
+                        f"capture={avg_capture * 1_000_000:.0f}us, "
                         f"encode={avg_encode * 1_000_000:.0f}us, "
                         f"decode={avg_decode * 1_000_000:.0f}us, "
-                        f"enqueue={avg_enqueue * 1000:.1f}ms"
+                        f"enqueue={avg_enqueue * 1_000_000:.0f}us"
                     )
                 else:
                     print(
                         f"Frame {frame_number}/{total_frames}: "
                         f"FPS={actual_fps:.1f}, "
-                        f"capture={avg_capture * 1000:.1f}ms, "
-                        f"overlay={avg_overlay * 1000:.1f}ms, "
-                        f"enqueue={avg_enqueue * 1000:.1f}ms"
+                        f"capture={avg_capture * 1_000_000:.0f}us, "
+                        f"enqueue={avg_enqueue * 1_000_000:.0f}us"
                     )
 
             # FPS タイミング調整(絶対時間ベース)
@@ -490,8 +468,8 @@ def main():
     except KeyboardInterrupt:
         print("\n中断されました")
 
-    # カメラを解放
-    cap.release()
+    # カメラを停止
+    device.stop()
 
     # エンコーダ/デコーダをフラッシュしてクリーンアップ
     if use_codec:
@@ -507,9 +485,15 @@ def main():
             decoder.flush()
         while decoded_frames:
             decoded_frame = decoded_frames.popleft()
-            y_plane, u_plane, v_plane = decoded_frame.planes()
-            pts_us = decoded_frame.timestamp
-            player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us)
+            if decoded_frame.format == VideoPixelFormat.NV12:
+                y_data = decoded_frame.plane(0)
+                uv_data = decoded_frame.plane(1)
+                pts_us = decoded_frame.timestamp
+                player.enqueue_video_nv12(y_data, uv_data, pts_us)
+            else:
+                y_data, u_data, v_data = decoded_frame.planes()
+                pts_us = decoded_frame.timestamp
+                player.enqueue_video_i420(y_data, u_data, v_data, pts_us)
             decoded_frame.close()
             rendered_frames += 1
 
@@ -526,11 +510,7 @@ def main():
         print(f"平均 FPS: {actual_fps:.2f}")
         if capture_times:
             print(
-                f"平均キャプチャ時間: {sum(capture_times) / len(capture_times) * 1000:.2f}ms"
-            )
-        if overlay_times:
-            print(
-                f"平均オーバーレイ時間: {sum(overlay_times) / len(overlay_times) * 1000:.2f}ms"
+                f"平均キャプチャ時間: {sum(capture_times) / len(capture_times) * 1_000_000:.0f}us"
             )
         if encode_times:
             print(
@@ -542,13 +522,13 @@ def main():
             )
         if enqueue_times:
             print(
-                f"平均 enqueue 時間: {sum(enqueue_times) / len(enqueue_times) * 1000:.2f}ms"
+                f"平均 enqueue 時間: {sum(enqueue_times) / len(enqueue_times) * 1_000_000:.0f}us"
             )
         # フレームサイズ統計
         print()
         if raw_frame_sizes:
             avg_raw = sum(raw_frame_sizes) / len(raw_frame_sizes)
-            print(f"平均生データサイズ (I420): {avg_raw / 1024:.2f} KB")
+            print(f"平均生データサイズ (NV12): {avg_raw / 1024:.2f} KB")
         if encoded_frame_sizes:
             avg_encoded = sum(encoded_frame_sizes) / len(encoded_frame_sizes)
             print(
@@ -556,7 +536,7 @@ def main():
             )
         if decoded_frame_sizes:
             avg_decoded = sum(decoded_frame_sizes) / len(decoded_frame_sizes)
-            print(f"平均デコード後サイズ (I420): {avg_decoded / 1024:.2f} KB")
+            print(f"平均デコード後サイズ (NV12/I420): {avg_decoded / 1024:.2f} KB")
         if raw_frame_sizes and encoded_frame_sizes:
             avg_raw = sum(raw_frame_sizes) / len(raw_frame_sizes)
             avg_encoded = sum(encoded_frame_sizes) / len(encoded_frame_sizes)

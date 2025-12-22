@@ -49,11 +49,11 @@ uv run python examples/blend2d_player.py --resolution 1280x720 --fps 30
 
 ## camera_player.py
 
-OpenCV でカメラ映像を取得し、raw-player で表示するサンプルです。
+uvc-py でカメラ映像を取得し、raw-player で表示するサンプルです。
 
 ### 依存
 
-- [opencv-python](https://github.com/opencv/opencv-python)
+- [uvc-py](https://github.com/shiguredo/uvc-py)
 - [webcodecs-py](https://github.com/shiguredo/webcodecs-py)
 
 ### 実行
@@ -82,3 +82,4 @@ uv run python examples/camera_player.py --camera 0 --width 1920 --height 1080
 | `--video-bitrate` | ビットレート (kbps) | 8000 |
 | `--flip-horizontal` | 左右反転 | なし |
 | `--flip-vertical` | 上下反転 | なし |
+| `--native-buffer` | ネイティブバッファを使用 (macOS のみ) | なし |
