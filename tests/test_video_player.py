@@ -368,3 +368,31 @@ def test_drain_video():
     assert stats["video_queue_size"] == 0
 
     player.close()
+
+
+def test_stats_overlay_default_false():
+    """stats_overlay のデフォルト値が False であることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    assert player.stats_overlay is False
+
+    player.close()
+
+
+def test_stats_overlay_toggle():
+    """stats_overlay を on/off 切り替えできることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    assert player.stats_overlay is False
+
+    player.stats_overlay = True
+    assert player.stats_overlay is True
+
+    player.stats_overlay = False
+    assert player.stats_overlay is False
+
+    player.close()

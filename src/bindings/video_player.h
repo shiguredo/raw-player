@@ -117,6 +117,10 @@ class VideoPlayer {
   size_t get_max_video_queue_size() const;
   void drain_video();
 
+  // === stats オーバーレイ ===
+  void set_stats_overlay(bool show);
+  bool get_stats_overlay() const;
+
  private:
   // 映像フレームのデータ構造
   struct VideoFrame {
@@ -198,6 +202,9 @@ class VideoPlayer {
   int fps_frame_count_ = 0;         // FPS 計算用フレームカウント
   float current_fps_ = 0.0f;        // 現在の FPS
 
+  // stats オーバーレイ
+  bool show_stats_overlay_ = false;
+
   // キーコールバック
   std::function<bool(int)> key_callback_;
 
@@ -212,4 +219,5 @@ class VideoPlayer {
   void process_audio_queue();          // 音声キューを処理
   int64_t get_audio_clock_us() const;  // 音声クロックを取得
   void render_next_frame();            // 次のフレームをレンダリング
+  void render_stats_overlay();         // stats オーバーレイを描画
 };

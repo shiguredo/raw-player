@@ -671,6 +671,57 @@ int64_t VideoPlayer::get_audio_clock_us() const {
   return first_audio_pts_us_ + played_us;
 }
 
+void VideoPlayer::render_stats_overlay() {
+  if (!show_stats_overlay_ || !renderer_) {
+    return;
+  }
+
+  float old_scale_x = 0.0f;
+  float old_scale_y = 0.0f;
+  SDL_GetRenderScale(renderer_, &old_scale_x, &old_scale_y);
+
+  const float scale = 2.0f;
+  SDL_SetRenderScale(renderer_, scale, scale);
+
+  const int char_size = SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE;
+  const float margin = 5.0f;
+  float y = margin;
+
+  SDL_SetRenderDrawColor(renderer_, 0, 255, 0, 255);
+
+  char buf[64];
+
+  std::snprintf(buf, sizeof(buf), "FPS: %.1f", current_fps_);
+  SDL_RenderDebugText(renderer_, margin, y, buf);
+  y += char_size + 2;
+
+  std::snprintf(buf, sizeof(buf), "%dx%d", texture_width_, texture_height_);
+  SDL_RenderDebugText(renderer_, margin, y, buf);
+  y += char_size + 2;
+
+  std::snprintf(buf, sizeof(buf), "Drop: %d Queue: %zu", dropped_frames_,
+                video_queue_.size());
+  SDL_RenderDebugText(renderer_, margin, y, buf);
+  y += char_size + 2;
+
+  if (audio_started_) {
+    int64_t sync_diff_ms = (get_audio_clock_us() - last_video_pts_us_) / 1000;
+    std::snprintf(buf, sizeof(buf), "Sync: %+lldms",
+                  static_cast<long long>(sync_diff_ms));
+    SDL_RenderDebugText(renderer_, margin, y, buf);
+    y += char_size + 2;
+  }
+
+  if (current_fps_ > 0 && last_frame_size_bytes_ > 0) {
+    double bitrate_mbps = static_cast<double>(last_frame_size_bytes_) *
+                          current_fps_ * 8.0 / 1000000.0;
+    std::snprintf(buf, sizeof(buf), "%.1f Mbps", bitrate_mbps);
+    SDL_RenderDebugText(renderer_, margin, y, buf);
+  }
+
+  SDL_SetRenderScale(renderer_, old_scale_x, old_scale_y);
+}
+
 void VideoPlayer::render_frame_internal(const VideoFrame& frame) {
   // 解像度またはフォーマットが変わったらテクスチャを再作成
   if (frame.width != texture_width_ || frame.height != texture_height_ ||
@@ -726,6 +777,7 @@ void VideoPlayer::render_frame_internal(const VideoFrame& frame) {
   SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
   SDL_RenderClear(renderer_);
   SDL_RenderTexture(renderer_, texture_, nullptr, nullptr);
+  render_stats_overlay();
   SDL_RenderPresent(renderer_);
 
   last_video_pts_us_ = frame.pts_us;
@@ -916,6 +968,12 @@ bool VideoPlayer::poll_events() {
     }
     if (event.type == SDL_EVENT_KEY_DOWN) {
       std::lock_guard<std::mutex> lock(mutex_);
+
+      // 'S' キーで stats オーバーレイを切り替え
+      if (event.key.key == SDLK_S) {
+        show_stats_overlay_ = !show_stats_overlay_;
+      }
+
       if (key_callback_) {
         int key_code = static_cast<int>(event.key.key);
         bool should_continue = key_callback_(key_code);
@@ -1077,6 +1135,16 @@ void VideoPlayer::drain_video() {
   video_start_time_ns_ = 0;
   first_video_pts_us_ = 0;
   video_only_started_ = false;
+}
+
+void VideoPlayer::set_stats_overlay(bool show) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  show_stats_overlay_ = show;
+}
+
+bool VideoPlayer::get_stats_overlay() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return show_stats_overlay_;
 }
 
 // === Python バインディング ===
@@ -1269,5 +1337,16 @@ void init_video_player(nb::module_& m) {
       .def("drain_video", &VideoPlayer::drain_video,
            nb::sig("def drain_video(self) -> None"),
            "Clear the video queue and reset timing.\n\n"
-           "Use this to recover from accumulated latency.");
+           "Use this to recover from accumulated latency.")
+
+      // stats オーバーレイ
+      .def_prop_rw("stats_overlay", &VideoPlayer::get_stats_overlay,
+                   &VideoPlayer::set_stats_overlay,
+                   nb::sig("def stats_overlay(self) -> bool"),
+                   nb::sig("def stats_overlay(self, value: bool) -> None"),
+                   "Enable/disable stats overlay on video.\n\n"
+                   "When enabled, displays FPS, resolution, dropped frames,\n"
+                   "queue size, sync difference (with audio), and bitrate\n"
+                   "as an overlay in the top-left corner of the video.\n"
+                   "Press 'S' key to toggle during playback.");
 }
