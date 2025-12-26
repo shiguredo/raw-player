@@ -179,6 +179,33 @@ wheels = [
 ]
 
 [[package]]
+name = "portaudio-py"
+version = "2025.1.0.dev0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/f0/b0f3f3ba3ea25363be200191d24c2203f1fe6d5d85fb50ff6061fc422271/portaudio_py-2025.1.0.dev0-cp312-cp312-macosx_15_0_arm64.whl", hash = "sha256:c8463e2cebcc408942e10d5cdf7fe4301968bff9dac2fd899a8e1a125c23ecd2", size = 114047, upload-time = "2025-12-23T09:23:28.159Z" },
+    { url = "https://files.pythonhosted.org/packages/9b/37/7ba22bfd1229ca43628c3fdfc6fd7b9592e6c502b15500b35333a941e94c/portaudio_py-2025.1.0.dev0-cp312-cp312-manylinux_2_34_aarch64.whl", hash = "sha256:92ff7c14127fe882c657a39f4e35ec2973057cd9285e792713c3b28ee180d5f0", size = 3275030, upload-time = "2025-12-23T09:23:28.547Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/b2/65f03769f8a7ca28bcd43f18c3a1ae2c5507ad5ec45caa5b43810858aff3/portaudio_py-2025.1.0.dev0-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:8c7b13e89d80a6389dc90f450d08d778327a081375cf2b21ef2c000ce3a90cf5", size = 3453322, upload-time = "2025-12-23T09:23:31.325Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/7c/75ee7c4d3319070593cf8745cf21b368b687504878ed8de24cb722e7bf16/portaudio_py-2025.1.0.dev0-cp312-cp312-win_amd64.whl", hash = "sha256:e1d41f6a2559710338bb7cb743667d32f8ec2d15af3fc705d2a29167af30f316", size = 142608, upload-time = "2025-12-23T09:23:29.272Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/a7/188aa87a13f025d700b6913ce0439935dc8da65e3b6f41d4f8529fae6a67/portaudio_py-2025.1.0.dev0-cp313-cp313-macosx_15_0_arm64.whl", hash = "sha256:fc59bbcca6e938565d37911ffa6dddc8812b5c9e270a5657f690702de288dc41", size = 113977, upload-time = "2025-12-23T09:23:28.256Z" },
+    { url = "https://files.pythonhosted.org/packages/94/0e/68d819641b2ce488868f504f5dcdfc15068b06b5de8dfaf58c8c80e98ef7/portaudio_py-2025.1.0.dev0-cp313-cp313-manylinux_2_34_aarch64.whl", hash = "sha256:145a5711c3b634d8bd98f773ff35d9c4e01f4c13fd416fb1fc9601612a1fdf31", size = 3274992, upload-time = "2025-12-23T09:23:30.638Z" },
+    { url = "https://files.pythonhosted.org/packages/95/ca/03173747e297224171d5576adf4c037d6e450aaa7664ad149ccec76dd58f/portaudio_py-2025.1.0.dev0-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:09fe9cdf73e1083fa1d5c8a70b5322ec204fd34df40576c3753c663012e30810", size = 3453257, upload-time = "2025-12-23T09:23:28.605Z" },
+    { url = "https://files.pythonhosted.org/packages/be/2b/7584a4ce2e873b24e312cbd00d1021c5bbc8b6f98979f1173103f5bd7e30/portaudio_py-2025.1.0.dev0-cp313-cp313-win_amd64.whl", hash = "sha256:b1a00c8dbed906f0f90c8accd3f5a9fc52e3e98a61baffc35e40b5e7b625b167", size = 142516, upload-time = "2025-12-23T09:23:31.895Z" },
+    { url = "https://files.pythonhosted.org/packages/77/93/50f19c3930366b00e998bce650a230f311a0bd20bee61ca2dfdf3a649dd4/portaudio_py-2025.1.0.dev0-cp313-cp313t-macosx_15_0_arm64.whl", hash = "sha256:a820d387db7396bc9aef806184a04ec29492dfae62f094dfadc070f189094efb", size = 117542, upload-time = "2025-12-23T09:23:27.879Z" },
+    { url = "https://files.pythonhosted.org/packages/59/e2/86226d96956523b70fd952619d84edad6435ca3394feebe1cf480cb881bf/portaudio_py-2025.1.0.dev0-cp313-cp313t-manylinux_2_34_aarch64.whl", hash = "sha256:f0988ec8485542226146df3f36611d58e4af0af128756a46dd0cb02afa2a6b5e", size = 3279715, upload-time = "2025-12-23T09:23:29.952Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/08/835dad2d802438cb621679ec84bf16f81dad49216c7ec6a660c75509b34f/portaudio_py-2025.1.0.dev0-cp313-cp313t-manylinux_2_34_x86_64.whl", hash = "sha256:b95dc55efa13e8a7976d72fee97849c7b347b868193899b6d45bf608bec8b6fe", size = 3456474, upload-time = "2025-12-23T09:23:25.292Z" },
+    { url = "https://files.pythonhosted.org/packages/15/72/09408e49d487f479c1600c433e5c2a02348ee8331ef3f759226a4bd3db56/portaudio_py-2025.1.0.dev0-cp313-cp313t-win_amd64.whl", hash = "sha256:14ab2e68ddfbefb39e0a93ce07bc39b00df075def297a672f232e9a38febfa24", size = 152215, upload-time = "2025-12-23T09:23:28.162Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/ab/f385566bf2c822a3eedc0efb9482c780290da2785cc73ad634ba18ee2b11/portaudio_py-2025.1.0.dev0-cp314-cp314-macosx_15_0_arm64.whl", hash = "sha256:3ae9c8ca3711e0bce1cecec8e1ffc863fa14b974c16fb4d3a858502c1c8dbc5f", size = 113920, upload-time = "2025-12-23T09:23:28.366Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/fb/7f430e34e43eb5d50d55b85ed55f87959c8657e37c2278a50b384c6437de/portaudio_py-2025.1.0.dev0-cp314-cp314-manylinux_2_34_aarch64.whl", hash = "sha256:e8c76e18bc175756886a574b5abcdd8a928e84f0508a686028d5bd2b6a5b7aff", size = 3275478, upload-time = "2025-12-23T09:23:30.999Z" },
+    { url = "https://files.pythonhosted.org/packages/06/c2/6803f404dd0ecee62391ad06acb9ec0550a934f976c20922657276a9e894/portaudio_py-2025.1.0.dev0-cp314-cp314-manylinux_2_34_x86_64.whl", hash = "sha256:46c2f6434b25a38414ba3b2d558b0ff47081455802d2b56c35e6113eadf03bfc", size = 3453262, upload-time = "2025-12-23T09:23:27.437Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/ae/41dc5176d8a2f874ef7cd6f5eebc4f9fabab9a43328be7fd65997c58c123/portaudio_py-2025.1.0.dev0-cp314-cp314-win_amd64.whl", hash = "sha256:c98df12e265442c974d99600deb29086c3b17a4467ec48b7b2da44eb7b292de5", size = 146269, upload-time = "2025-12-23T09:23:33.688Z" },
+    { url = "https://files.pythonhosted.org/packages/85/c2/c5ee5abc1ffd9062105504c776c76083f6b45dcea508c74abe44555b7a99/portaudio_py-2025.1.0.dev0-cp314-cp314t-macosx_15_0_arm64.whl", hash = "sha256:f10102c9185f3585f68e1f8a6f53dccf634089efad5dfaec014312b1e7ad75a6", size = 117521, upload-time = "2025-12-23T09:23:30.893Z" },
+    { url = "https://files.pythonhosted.org/packages/97/58/71a01fe3816de148d1c6e21763a171e53a1827bf18a0762cdfc41f62b816/portaudio_py-2025.1.0.dev0-cp314-cp314t-manylinux_2_34_aarch64.whl", hash = "sha256:9de24d0858437a7aa37acc1fa84610f9e5c8cdea34af7eab3a96b74057484787", size = 3279903, upload-time = "2025-12-23T09:23:30.375Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/d2/0f8a586841e28f930c3d2b565ec5329bbba4983a5612a048677564328554/portaudio_py-2025.1.0.dev0-cp314-cp314t-manylinux_2_34_x86_64.whl", hash = "sha256:28eb15420a6329355efe32ea12a46c304cba4ced82dbb36e8b86f09ba67baa7b", size = 3456485, upload-time = "2025-12-23T09:23:35.993Z" },
+    { url = "https://files.pythonhosted.org/packages/90/d7/59b2f6e91a6c58d6fe3841873ed357fb6ab8ca1181ec0c4c1590dcd9fc0a/portaudio_py-2025.1.0.dev0-cp314-cp314t-win_amd64.whl", hash = "sha256:ba62a9ce3a792d7761f9ca23c027bf94ef8ab48353a6cba2c4713f1ce2405728", size = 158106, upload-time = "2025-12-23T09:23:27.797Z" },
+]
+
+[[package]]
 name = "pygments"
 version = "2.19.2"
 source = { registry = "https://pypi.org/simple" }
@@ -224,6 +251,7 @@ dev = [
     { name = "blend2d-py" },
     { name = "mp4-py" },
     { name = "numpy" },
+    { name = "portaudio-py" },
     { name = "pytest" },
     { name = "pytest-timeout" },
     { name = "ruff" },
@@ -235,6 +263,7 @@ example = [
     { name = "blend2d-py" },
     { name = "mp4-py" },
     { name = "numpy" },
+    { name = "portaudio-py" },
     { name = "uvc-py" },
     { name = "webcodecs-py" },
 ]
@@ -255,6 +284,7 @@ dev = [
     { name = "blend2d-py" },
     { name = "mp4-py" },
     { name = "numpy" },
+    { name = "portaudio-py" },
     { name = "pytest" },
     { name = "pytest-timeout" },
     { name = "ruff" },
@@ -266,6 +296,7 @@ example = [
     { name = "blend2d-py" },
     { name = "mp4-py" },
     { name = "numpy" },
+    { name = "portaudio-py" },
     { name = "uvc-py" },
     { name = "webcodecs-py" },
 ]

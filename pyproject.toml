@@ -30,7 +30,7 @@ dev = [
     { include-group = "example" },
 ]
 test = ["pytest", "pytest-timeout", "numpy"]
-example = ["numpy", "webcodecs-py", "mp4-py", "blend2d-py", "uvc-py"]
+example = ["numpy", "webcodecs-py", "mp4-py", "blend2d-py", "uvc-py", "portaudio-py"]
 lint = ["ruff", "ty"]
 
 [tool.scikit-build]
