@@ -689,34 +689,128 @@ void VideoPlayer::render_stats_overlay() {
 
   SDL_SetRenderDrawColor(renderer_, 0, 255, 0, 255);
 
-  char buf[64];
+  char buf[128];
 
-  std::snprintf(buf, sizeof(buf), "FPS: %.1f", current_fps_);
+  // レンダラー名
+  const char* renderer_name = SDL_GetRendererName(renderer_);
+  std::snprintf(buf, sizeof(buf), "Renderer: %s",
+                renderer_name ? renderer_name : "unknown");
   SDL_RenderDebugText(renderer_, margin, y, buf);
   y += char_size + 2;
 
-  std::snprintf(buf, sizeof(buf), "%dx%d", texture_width_, texture_height_);
+  // フォーマット
+  const char* format_name = "unknown";
+  switch (texture_format_) {
+    case VideoFormat::I420:
+      format_name = "I420";
+      break;
+    case VideoFormat::NV12:
+      format_name = "NV12";
+      break;
+    case VideoFormat::YUY2:
+      format_name = "YUY2";
+      break;
+    case VideoFormat::RGBA:
+      format_name = "RGBA";
+      break;
+    case VideoFormat::BGRA:
+      format_name = "BGRA";
+      break;
+  }
+  std::snprintf(buf, sizeof(buf), "Format: %s %dx%d", format_name,
+                texture_width_, texture_height_);
   SDL_RenderDebugText(renderer_, margin, y, buf);
   y += char_size + 2;
 
-  std::snprintf(buf, sizeof(buf), "Drop: %d Queue: %zu", dropped_frames_,
-                video_queue_.size());
+  // FPS とビットレート
+  double bitrate_mbps = 0.0;
+  if (current_fps_ > 0 && last_frame_size_bytes_ > 0) {
+    bitrate_mbps = static_cast<double>(last_frame_size_bytes_) * current_fps_ *
+                   8.0 / 1000000.0;
+  }
+  std::snprintf(buf, sizeof(buf), "FPS: %.1f (%.1f Mbps)", current_fps_,
+                bitrate_mbps);
   SDL_RenderDebugText(renderer_, margin, y, buf);
   y += char_size + 2;
 
+  // 経過時間
+  double elapsed_sec = 0.0;
+  if (play_start_time_ns_ > 0) {
+    uint64_t now_ns = SDL_GetTicksNS();
+    elapsed_sec =
+        static_cast<double>(now_ns - play_start_time_ns_) / 1000000000.0;
+  }
+  int elapsed_min = static_cast<int>(elapsed_sec) / 60;
+  int elapsed_sec_part = static_cast<int>(elapsed_sec) % 60;
+  std::snprintf(buf, sizeof(buf), "Elapsed: %d:%02d", elapsed_min,
+                elapsed_sec_part);
+  SDL_RenderDebugText(renderer_, margin, y, buf);
+  y += char_size + 2;
+
+  // フレーム統計
+  std::snprintf(buf, sizeof(buf), "Frames: %lld enqueued / %lld rendered",
+                static_cast<long long>(total_frames_enqueued_),
+                static_cast<long long>(total_frames_rendered_));
+  SDL_RenderDebugText(renderer_, margin, y, buf);
+  y += char_size + 2;
+
+  // ドロップ/リピート/キュー
+  std::snprintf(buf, sizeof(buf), "Drop: %d Repeat: %d Queue: %zu",
+                dropped_frames_, repeated_frames_, video_queue_.size());
+  SDL_RenderDebugText(renderer_, margin, y, buf);
+  y += char_size + 2;
+
+  // 映像バッファ時間
+  double video_buffer_ms = 0.0;
+  if (video_queue_.size() >= 2) {
+    int64_t first_pts = video_queue_.front().pts_us;
+    int64_t last_pts = video_queue_.back().pts_us;
+    video_buffer_ms = static_cast<double>(last_pts - first_pts) / 1000.0;
+  }
+  std::snprintf(buf, sizeof(buf), "Video Buffer: %.1f ms", video_buffer_ms);
+  SDL_RenderDebugText(renderer_, margin, y, buf);
+  y += char_size + 2;
+
+  // 映像 PTS
+  double video_pts_sec = static_cast<double>(last_video_pts_us_) / 1000000.0;
+  std::snprintf(buf, sizeof(buf), "Video PTS: %.3f s", video_pts_sec);
+  SDL_RenderDebugText(renderer_, margin, y, buf);
+  y += char_size + 2;
+
+  // 音声情報
   if (audio_started_) {
+    // 音声フォーマット
+    std::snprintf(buf, sizeof(buf), "Audio: %d Hz %dch %s", audio_sample_rate_,
+                  audio_channels_, audio_is_float_ ? "float32" : "int16");
+    SDL_RenderDebugText(renderer_, margin, y, buf);
+    y += char_size + 2;
+
+    // 音声バッファ
+    double audio_queue_ms = 0.0;
+    if (audio_stream_) {
+      int queued_bytes = SDL_GetAudioStreamQueued(audio_stream_);
+      int sample_size = (audio_is_float_ ? 4 : 2) * audio_channels_;
+      int64_t queued_samples = queued_bytes / sample_size;
+      audio_queue_ms = (audio_sample_rate_ > 0)
+                           ? (queued_samples * 1000.0 / audio_sample_rate_)
+                           : 0.0;
+    }
+    std::snprintf(buf, sizeof(buf), "Audio Buffer: %.1f ms", audio_queue_ms);
+    SDL_RenderDebugText(renderer_, margin, y, buf);
+    y += char_size + 2;
+
+    // 音声 PTS
+    double audio_pts_sec = static_cast<double>(get_audio_clock_us()) / 1000000.0;
+    std::snprintf(buf, sizeof(buf), "Audio PTS: %.3f s", audio_pts_sec);
+    SDL_RenderDebugText(renderer_, margin, y, buf);
+    y += char_size + 2;
+
+    // AV 同期差
     int64_t sync_diff_ms = (get_audio_clock_us() - last_video_pts_us_) / 1000;
-    std::snprintf(buf, sizeof(buf), "Sync: %+lldms",
+    std::snprintf(buf, sizeof(buf), "AV Sync: %+lld ms",
                   static_cast<long long>(sync_diff_ms));
     SDL_RenderDebugText(renderer_, margin, y, buf);
     y += char_size + 2;
-  }
-
-  if (current_fps_ > 0 && last_frame_size_bytes_ > 0) {
-    double bitrate_mbps = static_cast<double>(last_frame_size_bytes_) *
-                          current_fps_ * 8.0 / 1000000.0;
-    std::snprintf(buf, sizeof(buf), "%.1f Mbps", bitrate_mbps);
-    SDL_RenderDebugText(renderer_, margin, y, buf);
   }
 
   SDL_SetRenderScale(renderer_, old_scale_x, old_scale_y);
