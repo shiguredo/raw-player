@@ -112,6 +112,7 @@ def generate_frame(
     actual_fps: float,
     target_fps: int,
     codec_type: str | None = None,
+    hide_info: bool = False,
 ) -> np.ndarray:
     """
     blend2d でアニメーションフレームを生成
@@ -212,21 +213,22 @@ def generate_frame(
         ctx.set_fill_style_rgba(255, 255, 255, 255)
         ctx.fill_utf8_text(text_x, text_y, font_large, time_text)
 
-        # 情報表示(左上)
-        ctx.set_fill_style_rgba(255, 255, 255, 200)
-        codec_text = f"{codec_type} -> I420" if codec_type else "RAW BGRA"
-        info_text = f"{width}x{height} | {target_fps} FPS | {codec_text}"
-        ctx.fill_utf8_text(30, 50, font_small, info_text)
+        # 情報表示
+        if not hide_info:
+            ctx.set_fill_style_rgba(255, 255, 255, 200)
+            codec_text = f"{codec_type} -> I420" if codec_type else "RAW BGRA"
+            info_text = f"{width}x{height} | {target_fps} FPS | {codec_text}"
+            ctx.fill_utf8_text(30, 50, font_small, info_text)
 
-        # フレーム番号(左上)
-        ctx.set_fill_style_rgba(200, 200, 200, 255)
-        frame_text = f"Frame: {frame_number:06d}"
-        ctx.fill_utf8_text(30, 95, font_small, frame_text)
+            # フレーム番号
+            ctx.set_fill_style_rgba(200, 200, 200, 255)
+            frame_text = f"Frame: {frame_number:06d}"
+            ctx.fill_utf8_text(30, 95, font_small, frame_text)
 
-        # 実際の FPS(左上、緑)
-        ctx.set_fill_style_rgba(150, 255, 150, 255)
-        fps_text = f"FPS: {actual_fps:.1f}"
-        ctx.fill_utf8_text(30, 140, font_small, fps_text)
+            # 実際の FPS (緑)
+            ctx.set_fill_style_rgba(150, 255, 150, 255)
+            fps_text = f"FPS: {actual_fps:.1f}"
+            ctx.fill_utf8_text(30, 140, font_small, fps_text)
 
     return img.asarray()
 
@@ -265,6 +267,11 @@ def main():
         type=str,
         default=f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}",
         help=f"解像度 (WIDTHxHEIGHT)。デフォルト: {DEFAULT_WIDTH}x{DEFAULT_HEIGHT}",
+    )
+    parser.add_argument(
+        "--hide-info",
+        action="store_true",
+        help="情報表示を非表示にする",
     )
     args = parser.parse_args()
 
@@ -447,6 +454,7 @@ def main():
                 current_fps,
                 fps,
                 args.video_codec_type,
+                args.hide_info,
             )
             generate_time = time.perf_counter() - generate_start
             generate_times.append(generate_time)
