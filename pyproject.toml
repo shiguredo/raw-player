@@ -4,6 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "raw-player"
+authors = [{ name = "Shiguredo Inc.", email = "contact+pypi@shiguredo.jp" }]
 dynamic = ["version"]
 description = "Raw audio/video player for Python"
 readme = "README.md"
@@ -22,6 +23,11 @@ classifiers = [
     "Operating System :: Microsoft :: Windows",
 ]
 requires-python = ">=3.12"
+dependencies = []
+
+[project.urls]
+Source = "https://github.com/shiguredo/raw-player"
+Discord = "https://discord.gg/shiguredo"
 
 [dependency-groups]
 dev = [
@@ -30,8 +36,8 @@ dev = [
     { include-group = "example" },
 ]
 test = ["pytest", "pytest-timeout", "numpy"]
-example = ["numpy", "webcodecs-py", "mp4-py", "blend2d-py", "uvc-py"]
 lint = ["ruff", "ty"]
+example = ["numpy", "webcodecs-py", "mp4-py", "blend2d-py", "uvc-py"]
 
 [tool.scikit-build]
 minimum-version = "0.11.3"
@@ -43,6 +49,7 @@ verbose = false
 
 [tool.scikit-build.cmake]
 version = ">=4.2"
+define = { "CMAKE_CXX_STANDARD" = "20" }
 args = ["-DCMAKE_BUILD_TYPE=Release"]
 
 [tool.scikit-build.wheel]
@@ -61,3 +68,7 @@ python-preference = "only-managed"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100

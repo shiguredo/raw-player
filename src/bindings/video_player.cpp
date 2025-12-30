@@ -1263,7 +1263,8 @@ void init_video_player(nb::module_& m) {
           nb::sig("def max_video_queue_size(self) -> int"),
           nb::sig("def max_video_queue_size(self, value: int) -> None"),
           "Maximum video queue size.\n\n"
-          "When enqueue_video_* is called and the queue size exceeds this limit,\n"
+          "When enqueue_video_* is called and the queue size exceeds this "
+          "limit,\n"
           "older frames are dropped to maintain low latency.\n"
           "Set to 0 to disable the limit (default: 5).")
       .def("drain_video", &VideoPlayer::drain_video,

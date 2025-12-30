@@ -513,17 +513,11 @@ def main():
                 f"平均キャプチャ時間: {sum(capture_times) / len(capture_times) * 1_000_000:.0f}us"
             )
         if encode_times:
-            print(
-                f"平均エンコード時間: {sum(encode_times) / len(encode_times) * 1_000_000:.0f}us"
-            )
+            print(f"平均エンコード時間: {sum(encode_times) / len(encode_times) * 1_000_000:.0f}us")
         if decode_times:
-            print(
-                f"平均デコード時間: {sum(decode_times) / len(decode_times) * 1_000_000:.0f}us"
-            )
+            print(f"平均デコード時間: {sum(decode_times) / len(decode_times) * 1_000_000:.0f}us")
         if enqueue_times:
-            print(
-                f"平均 enqueue 時間: {sum(enqueue_times) / len(enqueue_times) * 1_000_000:.0f}us"
-            )
+            print(f"平均 enqueue 時間: {sum(enqueue_times) / len(enqueue_times) * 1_000_000:.0f}us")
         # フレームサイズ統計
         print()
         if raw_frame_sizes:
@@ -531,9 +525,7 @@ def main():
             print(f"平均生データサイズ (NV12): {avg_raw / 1024:.2f} KB")
         if encoded_frame_sizes:
             avg_encoded = sum(encoded_frame_sizes) / len(encoded_frame_sizes)
-            print(
-                f"平均エンコード後サイズ ({args.video_codec_type}): {avg_encoded / 1024:.2f} KB"
-            )
+            print(f"平均エンコード後サイズ ({args.video_codec_type}): {avg_encoded / 1024:.2f} KB")
         if decoded_frame_sizes:
             avg_decoded = sum(decoded_frame_sizes) / len(decoded_frame_sizes)
             print(f"平均デコード後サイズ (NV12/I420): {avg_decoded / 1024:.2f} KB")
@@ -541,9 +533,7 @@ def main():
             avg_raw = sum(raw_frame_sizes) / len(raw_frame_sizes)
             avg_encoded = sum(encoded_frame_sizes) / len(encoded_frame_sizes)
             compression_ratio = avg_raw / avg_encoded
-            print(
-                f"圧縮率: {compression_ratio:.1f}x ({avg_encoded / avg_raw * 100:.1f}%)"
-            )
+            print(f"圧縮率: {compression_ratio:.1f}x ({avg_encoded / avg_raw * 100:.1f}%)")
 
         # プレイヤー統計を表示
         print()

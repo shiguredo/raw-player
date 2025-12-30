@@ -293,9 +293,7 @@ def main():
         "H264": "avc1.640032",  # High Profile, Level 5.0 (1080p60対応)
         "H265": "hvc1.1.6.L93.B0",  # Main Profile, Level 3.1
     }
-    codec_string = (
-        codec_map.get(args.video_codec_type, "") if args.video_codec_type else ""
-    )
+    codec_string = codec_map.get(args.video_codec_type, "") if args.video_codec_type else ""
     bitrate = args.video_bitrate * 1000  # kbps -> bps
 
     total_frames = int(args.duration * fps)
@@ -487,15 +485,11 @@ def main():
                         y_data = decoded_frame.plane(0)
                         uv_data = decoded_frame.plane(1)
                         decoded_frame_sizes.append(y_data.nbytes + uv_data.nbytes)
-                        player.enqueue_video_nv12(
-                            y_data, uv_data, decoded_frame.timestamp
-                        )
+                        player.enqueue_video_nv12(y_data, uv_data, decoded_frame.timestamp)
                     else:
                         # I420: Y, U, V プレーン
                         y_plane, u_plane, v_plane = decoded_frame.planes()
-                        decoded_frame_sizes.append(
-                            y_plane.nbytes + u_plane.nbytes + v_plane.nbytes
-                        )
+                        decoded_frame_sizes.append(y_plane.nbytes + u_plane.nbytes + v_plane.nbytes)
                         player.enqueue_video_i420(
                             y_plane, u_plane, v_plane, decoded_frame.timestamp
                         )
@@ -558,9 +552,7 @@ def main():
                 player.enqueue_video_nv12(y_data, uv_data, decoded_frame.timestamp)
             else:
                 y_plane, u_plane, v_plane = decoded_frame.planes()
-                player.enqueue_video_i420(
-                    y_plane, u_plane, v_plane, decoded_frame.timestamp
-                )
+                player.enqueue_video_i420(y_plane, u_plane, v_plane, decoded_frame.timestamp)
             decoded_frame.close()
             rendered_frames += 1
 
@@ -579,13 +571,9 @@ def main():
         print(f"ドロップフレーム: {stats['dropped_frames']}")
         print(f"リピートフレーム: {stats['repeated_frames']}")
         if generate_times:
-            print(
-                f"平均生成時間: {sum(generate_times) / len(generate_times) * 1000:.2f}ms"
-            )
+            print(f"平均生成時間: {sum(generate_times) / len(generate_times) * 1000:.2f}ms")
         if encoder and decoder and convert_times:
-            print(
-                f"平均変換時間: {sum(convert_times) / len(convert_times) * 1000:.2f}ms"
-            )
+            print(f"平均変換時間: {sum(convert_times) / len(convert_times) * 1000:.2f}ms")
         if encoder and decoder:
             if encode_times:
                 print(
@@ -614,9 +602,7 @@ def main():
                 avg_raw = sum(raw_frame_sizes) / len(raw_frame_sizes)
                 avg_encoded = sum(encoded_frame_sizes) / len(encoded_frame_sizes)
                 compression_ratio = avg_raw / avg_encoded
-                print(
-                    f"圧縮率: {compression_ratio:.1f}x ({avg_encoded / avg_raw * 100:.1f}%)"
-                )
+                print(f"圧縮率: {compression_ratio:.1f}x ({avg_encoded / avg_raw * 100:.1f}%)")
 
     player.close()
     print("完了")
