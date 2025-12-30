@@ -37,7 +37,14 @@ dev = [
 ]
 test = ["pytest", "pytest-timeout", "numpy"]
 lint = ["ruff", "ty"]
-example = ["numpy", "webcodecs-py", "mp4-py", "blend2d-py", "uvc-py"]
+example = [
+    "numpy",
+    "webcodecs-py",
+    "mp4-py",
+    "blend2d-py",
+    "uvc-py",
+    "portaudio-py",
+]
 
 [tool.scikit-build]
 minimum-version = "0.11.3"
