@@ -59,7 +59,6 @@ PCM / I420 / NV12 / YUY2 / RGBA / BGRA データを PTS (Presentation Timestamp)
 - 3.14
 - 3.14t
 - 3.13
-- 3.13t
 - 3.12
 
 ## インストール
