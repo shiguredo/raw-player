@@ -107,6 +107,8 @@ else()
         # OpenGL 無効化 (Vulkan 優先)
         -DSDL_OPENGL=OFF
         -DSDL_OPENGLES=OFF
+        # スクリーンセーバー機能は不要
+        -DSDL_X11_XSCRNSAVER=OFF
     )
 endif()
 
