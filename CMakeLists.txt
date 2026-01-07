@@ -40,10 +40,10 @@ include(ExternalProject)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/deps.json DEPS_JSON)
 
 # SDL3 の設定を解析
-string(JSON SDL3_VERSION GET ${DEPS_JSON} sdl3 version)
-string(JSON SDL3_GIT_REPOSITORY GET ${DEPS_JSON} sdl3 repository)
+string(JSON SDL3_TAG GET ${DEPS_JSON} sdl3 tag)
+string(JSON SDL3_GIT_URL GET ${DEPS_JSON} sdl3 url)
 
-message(STATUS "SDL3 version: ${SDL3_VERSION}")
+message(STATUS "SDL3 tag: ${SDL3_TAG}")
 
 # 静的ライブラリのビルドオプションを設定
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "静的ライブラリをビルド" FORCE)
@@ -62,9 +62,9 @@ endif()
 
 # ========== SDL3 ==========
 message(STATUS "Setting up SDL3...")
-set(SDL3_SOURCE_DIR "${DEPS_DIR}/sdl3/${SDL3_VERSION}/source")
-set(SDL3_BUILD_DIR "${DEPS_DIR}/sdl3/${SDL3_VERSION}/build")
-set(SDL3_INSTALL_DIR "${DEPS_DIR}/sdl3/${SDL3_VERSION}/install")
+set(SDL3_SOURCE_DIR "${DEPS_DIR}/sdl3/${SDL3_TAG}/source")
+set(SDL3_BUILD_DIR "${DEPS_DIR}/sdl3/${SDL3_TAG}/build")
+set(SDL3_INSTALL_DIR "${DEPS_DIR}/sdl3/${SDL3_TAG}/install")
 
 # Windows では .lib、それ以外では .a
 if(WIN32)
@@ -118,8 +118,8 @@ else()
     message(STATUS "Building SDL3...")
     ExternalProject_Add(
         sdl3_build
-        GIT_REPOSITORY ${SDL3_GIT_REPOSITORY}
-        GIT_TAG release-${SDL3_VERSION}
+        GIT_REPOSITORY ${SDL3_GIT_URL}
+        GIT_TAG ${SDL3_TAG}
         GIT_SHALLOW TRUE
         SOURCE_DIR ${SDL3_SOURCE_DIR}
         BINARY_DIR ${SDL3_BUILD_DIR}
