@@ -109,6 +109,8 @@ else()
         -DSDL_OPENGLES=OFF
         # スクリーンセーバー機能は不要
         -DSDL_X11_XSCRNSAVER=OFF
+        # XTEST は不要
+        -DSDL_X11_XTEST=OFF
     )
 endif()
 
