@@ -597,6 +597,10 @@ void VideoPlayer::enqueue_audio(nb::ndarray<nb::c_contig, nb::device::cpu> pcm,
     throw std::invalid_argument("Audio must be 1D or 2D");
   }
 
+  if (channels <= 0) {
+    throw std::invalid_argument("channels must be positive");
+  }
+
   AudioChunk chunk;
   chunk.pts_us = pts_us;
   chunk.sample_rate = sample_rate;
@@ -675,8 +679,11 @@ int64_t VideoPlayer::get_audio_clock_us() const {
   }
 
   int queued_bytes = SDL_GetAudioStreamQueued(audio_stream_);
+  if (queued_bytes < 0) {
+    queued_bytes = 0;
+  }
   int sample_size = (audio_is_float_ ? 4 : 2) * audio_channels_;
-  int64_t queued_samples = queued_bytes / sample_size;
+  int64_t queued_samples = (sample_size > 0) ? (queued_bytes / sample_size) : 0;
   int64_t played_samples = audio_samples_written_ - queued_samples;
 
   if (played_samples < 0) {
@@ -1064,6 +1071,8 @@ void VideoPlayer::close() {
 }
 
 bool VideoPlayer::poll_events() {
+  SDL_WindowID my_window_id = SDL_GetWindowID(window_);
+
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
     if (event.type == SDL_EVENT_QUIT) {
@@ -1072,11 +1081,20 @@ bool VideoPlayer::poll_events() {
       return false;
     }
     if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+      // 自分のウィンドウのイベントのみ処理
+      if (event.window.windowID != my_window_id) {
+        continue;
+      }
       std::lock_guard<std::mutex> lock(mutex_);
       open_ = false;
       return false;
     }
     if (event.type == SDL_EVENT_KEY_DOWN) {
+      // 自分のウィンドウのイベントのみ処理
+      if (event.key.windowID != my_window_id) {
+        continue;
+      }
+
       std::function<bool(int)> callback_copy;
       int key_code = static_cast<int>(event.key.key);
 

@@ -36,6 +36,10 @@ void AudioPlayer::enqueue_audio(nb::ndarray<nb::c_contig, nb::device::cpu> pcm,
     channels = static_cast<int>(pcm.shape(1));
   }
 
+  if (channels <= 0) {
+    throw std::invalid_argument("channels must be positive");
+  }
+
   // フォーマットを決定(int16 または float32)
   bool is_float = false;
   int sample_size = 0;
@@ -146,6 +150,9 @@ int64_t AudioPlayer::get_audio_clock_us() const {
 
   // SDL 内のキュー済みバイト数を取得
   int queued_bytes = SDL_GetAudioStreamQueued(audio_stream_);
+  if (queued_bytes < 0) {
+    queued_bytes = 0;
+  }
   int sample_size = audio_is_float_ ? 4 : 2;
   int bytes_per_frame = audio_channels_ * sample_size;
   int queued_frames =

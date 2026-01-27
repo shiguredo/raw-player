@@ -503,3 +503,21 @@ def test_enqueue_video_nv12_odd_dimensions():
         player.enqueue_video_nv12(y_plane, uv_plane, pts_us=0)
 
     player.close()
+
+
+def test_enqueue_audio_zero_channels():
+    """enqueue_audio に channels=0 の配列を渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    sample_rate = 48000
+    frames = 1024
+
+    # (frames, 0) の形状で channels=0 を作成
+    pcm = np.zeros((frames, 0), dtype=np.int16)
+
+    with pytest.raises(Exception):
+        player.enqueue_audio(pcm, pts_us=0, sample_rate=sample_rate)
+
+    player.close()
