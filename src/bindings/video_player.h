@@ -113,7 +113,7 @@ class VideoPlayer {
   nb::dict stats() const;
 
   // === キューサイズ制御 ===
-  void set_max_video_queue_size(size_t size);
+  void set_max_video_queue_size(int64_t size);
   size_t get_max_video_queue_size() const;
   void drain_video();
 

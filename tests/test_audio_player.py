@@ -147,3 +147,35 @@ def test_audio_player_play_pause_stop():
 
     player.stop()
     assert player.is_playing is False
+
+
+def test_audio_player_enqueue_zero_sample_rate():
+    """enqueue_audio に sample_rate=0 を渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.AudioPlayer()
+
+    sample_rate = 0
+    frames = 1024
+    channels = 2
+
+    pcm = np.zeros((frames, channels), dtype=np.int16)
+
+    with pytest.raises(Exception):
+        player.enqueue_audio(pcm, pts_us=0, sample_rate=sample_rate)
+
+
+def test_audio_player_enqueue_negative_sample_rate():
+    """enqueue_audio に負の sample_rate を渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.AudioPlayer()
+
+    sample_rate = -48000
+    frames = 1024
+    channels = 2
+
+    pcm = np.zeros((frames, channels), dtype=np.int16)
+
+    with pytest.raises(Exception):
+        player.enqueue_audio(pcm, pts_us=0, sample_rate=sample_rate)

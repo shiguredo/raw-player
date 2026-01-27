@@ -132,6 +132,12 @@ void VideoPlayer::enqueue_video_i420(
   int h = static_cast<int>(y.shape(0));
   int w = static_cast<int>(y.shape(1));
 
+  // I420 では幅と高さは偶数である必要がある
+  if (w % 2 != 0 || h % 2 != 0) {
+    throw std::invalid_argument(
+        "I420 format requires even width and height");
+  }
+
   if (u.ndim() != 2 || u.shape(0) != h / 2 || u.shape(1) != w / 2) {
     throw std::invalid_argument("U plane must be 2D with shape (H/2, W/2)");
   }
@@ -193,6 +199,12 @@ void VideoPlayer::enqueue_video_nv12(
   }
   int h = static_cast<int>(y.shape(0));
   int w = static_cast<int>(y.shape(1));
+
+  // NV12 では幅と高さは偶数である必要がある
+  if (w % 2 != 0 || h % 2 != 0) {
+    throw std::invalid_argument(
+        "NV12 format requires even width and height");
+  }
 
   if (uv.ndim() != 2 || uv.shape(0) != h / 2 || uv.shape(1) != w) {
     throw std::invalid_argument("UV plane must be 2D with shape (H/2, W)");
@@ -563,6 +575,10 @@ void VideoPlayer::enqueue_video_bgra(
 void VideoPlayer::enqueue_audio(nb::ndarray<nb::c_contig, nb::device::cpu> pcm,
                                 int64_t pts_us,
                                 int sample_rate) {
+  if (sample_rate <= 0) {
+    throw std::invalid_argument("sample_rate must be positive");
+  }
+
   // dtype をチェック
   bool is_float = false;
   if (pcm.dtype() == nb::dtype<float>()) {
@@ -1061,17 +1077,26 @@ bool VideoPlayer::poll_events() {
       return false;
     }
     if (event.type == SDL_EVENT_KEY_DOWN) {
-      std::lock_guard<std::mutex> lock(mutex_);
+      std::function<bool(int)> callback_copy;
+      int key_code = static_cast<int>(event.key.key);
 
-      // 'S' キーで stats オーバーレイを切り替え
-      if (event.key.key == SDLK_S) {
-        show_stats_overlay_ = !show_stats_overlay_;
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        // 'S' キーで stats オーバーレイを切り替え
+        if (event.key.key == SDLK_S) {
+          show_stats_overlay_ = !show_stats_overlay_;
+        }
+
+        // コールバックをコピーしてロック外で実行
+        callback_copy = key_callback_;
       }
 
-      if (key_callback_) {
-        int key_code = static_cast<int>(event.key.key);
-        bool should_continue = key_callback_(key_code);
+      // ロック外でコールバックを実行
+      if (callback_copy) {
+        bool should_continue = callback_copy(key_code);
         if (!should_continue) {
+          std::lock_guard<std::mutex> lock(mutex_);
           open_ = false;
           return false;
         }
@@ -1211,9 +1236,12 @@ nb::dict VideoPlayer::stats() const {
   return result;
 }
 
-void VideoPlayer::set_max_video_queue_size(size_t size) {
+void VideoPlayer::set_max_video_queue_size(int64_t size) {
+  if (size < 0) {
+    throw std::invalid_argument("max_video_queue_size must be non-negative");
+  }
   std::lock_guard<std::mutex> lock(mutex_);
-  max_video_queue_size_ = size;
+  max_video_queue_size_ = static_cast<size_t>(size);
 }
 
 size_t VideoPlayer::get_max_video_queue_size() const {

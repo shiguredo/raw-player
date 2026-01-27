@@ -396,3 +396,110 @@ def test_stats_overlay_toggle():
     assert player.stats_overlay is False
 
     player.close()
+
+
+def test_enqueue_audio_zero_sample_rate():
+    """enqueue_audio に sample_rate=0 を渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    sample_rate = 0
+    frames = 1024
+    channels = 2
+
+    pcm = np.zeros((frames, channels), dtype=np.int16)
+
+    with pytest.raises(Exception):
+        player.enqueue_audio(pcm, pts_us=0, sample_rate=sample_rate)
+
+    player.close()
+
+
+def test_enqueue_audio_negative_sample_rate():
+    """enqueue_audio に負の sample_rate を渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    sample_rate = -48000
+    frames = 1024
+    channels = 2
+
+    pcm = np.zeros((frames, channels), dtype=np.int16)
+
+    with pytest.raises(Exception):
+        player.enqueue_audio(pcm, pts_us=0, sample_rate=sample_rate)
+
+    player.close()
+
+
+def test_max_video_queue_size_negative():
+    """max_video_queue_size に負値を設定するとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    with pytest.raises(Exception):
+        player.max_video_queue_size = -1
+
+    player.close()
+
+
+def test_enqueue_video_i420_odd_dimensions():
+    """enqueue_video_i420 に奇数サイズを渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    # 奇数の高さ
+    height = 241
+    width = 320
+
+    y_plane = np.zeros((height, width), dtype=np.uint8)
+    u_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+    v_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+
+    with pytest.raises(Exception):
+        player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us=0)
+
+    player.close()
+
+
+def test_enqueue_video_i420_odd_width():
+    """enqueue_video_i420 に奇数の幅を渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    # 奇数の幅
+    height = 240
+    width = 321
+
+    y_plane = np.zeros((height, width), dtype=np.uint8)
+    u_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+    v_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+
+    with pytest.raises(Exception):
+        player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us=0)
+
+    player.close()
+
+
+def test_enqueue_video_nv12_odd_dimensions():
+    """enqueue_video_nv12 に奇数サイズを渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    # 奇数の高さ
+    height = 241
+    width = 320
+
+    y_plane = np.zeros((height, width), dtype=np.uint8)
+    uv_plane = np.zeros((height // 2, width), dtype=np.uint8)
+
+    with pytest.raises(Exception):
+        player.enqueue_video_nv12(y_plane, uv_plane, pts_us=0)
+
+    player.close()

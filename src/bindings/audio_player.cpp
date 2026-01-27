@@ -1,5 +1,6 @@
 #include "audio_player.h"
 
+#include <algorithm>
 #include <cstring>
 #include <stdexcept>
 
@@ -16,6 +17,10 @@ AudioPlayer::~AudioPlayer() {
 void AudioPlayer::enqueue_audio(nb::ndarray<nb::c_contig, nb::device::cpu> pcm,
                                 int64_t pts_us,
                                 int sample_rate) {
+  if (sample_rate <= 0) {
+    throw std::invalid_argument("sample_rate must be positive");
+  }
+
   std::lock_guard<std::mutex> lock(mutex_);
 
   // ndarray の検証
