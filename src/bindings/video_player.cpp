@@ -1136,6 +1136,9 @@ bool VideoPlayer::poll_events() {
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
     if (event.type == SDL_EVENT_QUIT) {
+      // 再生を停止し、論理的に閉じた状態にする
+      // SDL リソース (window_, renderer_, texture_, audio_stream_) の解放は
+      // デストラクタまたは明示的な close() 呼び出しに委ねる
       std::lock_guard<std::mutex> lock(mutex_);
       if (audio_stream_) {
         SDL_PauseAudioStreamDevice(audio_stream_);
@@ -1149,6 +1152,9 @@ bool VideoPlayer::poll_events() {
       if (event.window.windowID != my_window_id) {
         continue;
       }
+      // 再生を停止し、論理的に閉じた状態にする
+      // SDL リソース (window_, renderer_, texture_, audio_stream_) の解放は
+      // デストラクタまたは明示的な close() 呼び出しに委ねる
       std::lock_guard<std::mutex> lock(mutex_);
       if (audio_stream_) {
         SDL_PauseAudioStreamDevice(audio_stream_);
@@ -1194,7 +1200,12 @@ bool VideoPlayer::poll_events() {
         nb::gil_scoped_acquire gil;
         bool should_continue = callback_copy(key_code);
         if (!should_continue) {
+          // SDL_EVENT_QUIT と同様の停止処理を行う
           std::lock_guard<std::mutex> lock(mutex_);
+          if (audio_stream_) {
+            SDL_PauseAudioStreamDevice(audio_stream_);
+          }
+          playing_ = false;
           open_ = false;
           return false;
         }
@@ -1298,8 +1309,9 @@ nb::dict VideoPlayer::stats() const {
   result["dropped_frames"] = dropped_frames_;
   result["repeated_frames"] = repeated_frames_;
   result["video_pts_us"] = last_video_pts_us_;
-  result["audio_pts_us"] = get_audio_clock_us();
-  result["sync_diff_us"] = get_audio_clock_us() - last_video_pts_us_;
+  int64_t audio_clock_us = get_audio_clock_us();
+  result["audio_pts_us"] = audio_clock_us;
+  result["sync_diff_us"] = audio_clock_us - last_video_pts_us_;
   result["current_video_width"] = texture_width_;
   result["current_video_height"] = texture_height_;
 
