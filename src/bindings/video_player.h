@@ -173,6 +173,7 @@ class VideoPlayer {
   bool audio_started_ = false;         // 音声再生が開始されたか
   int64_t last_video_pts_us_ = 0;      // 最後にレンダリングした映像の PTS
   bool playing_ = false;               // 再生中フラグ
+  bool has_played_ = false;            // play() が一度でも呼ばれたか
 
   // 映像のみモード用のタイミング
   uint64_t video_start_time_ns_ =

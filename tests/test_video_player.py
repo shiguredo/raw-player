@@ -546,3 +546,51 @@ def test_enqueue_video_yuy2_odd_width():
         player.enqueue_video_yuy2(yuy2_data, pts_us=0)
 
     player.close()
+
+
+def test_enqueue_before_play():
+    """play() 前にプリバッファリングできることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    height = 240
+    width = 320
+
+    y_plane = np.zeros((height, width), dtype=np.uint8)
+    u_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+    v_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+
+    for i in range(3):
+        player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us=i * 33333)
+
+    stats = player.stats()
+    assert stats["video_queue_size"] == 3
+    assert stats["total_frames_enqueued"] == 3
+
+    player.close()
+
+
+def test_enqueue_ignored_after_pause():
+    """pause() 後のキューイングが無視されることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+    player.play()
+    player.pause()
+
+    height = 240
+    width = 320
+
+    y_plane = np.zeros((height, width), dtype=np.uint8)
+    u_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+    v_plane = np.zeros((height // 2, width // 2), dtype=np.uint8)
+
+    for i in range(3):
+        player.enqueue_video_i420(y_plane, u_plane, v_plane, pts_us=i * 33333)
+
+    stats = player.stats()
+    assert stats["video_queue_size"] == 0
+    assert stats["total_frames_enqueued"] == 0
+
+    player.close()

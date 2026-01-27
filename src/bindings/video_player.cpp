@@ -172,7 +172,7 @@ void VideoPlayer::enqueue_video_i420(
     std::memcpy(frame.v_data.data(), v_ptr, v_size);
 
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!playing_) {
+    if (has_played_ && !playing_) {
       return;
     }
     last_frame_size_bytes_ = static_cast<int64_t>(
@@ -234,7 +234,7 @@ void VideoPlayer::enqueue_video_nv12(
     std::memcpy(frame.u_data.data(), uv_ptr, uv_size);
 
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!playing_) {
+    if (has_played_ && !playing_) {
       return;
     }
     last_frame_size_bytes_ =
@@ -337,7 +337,7 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!playing_) {
+    if (has_played_ && !playing_) {
       return;
     }
     last_frame_size_bytes_ =
@@ -394,7 +394,7 @@ void VideoPlayer::enqueue_video_yuy2(
     std::memcpy(frame.y_data.data(), data_ptr, data_size);
 
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!playing_) {
+    if (has_played_ && !playing_) {
       return;
     }
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
@@ -481,7 +481,7 @@ void VideoPlayer::enqueue_video_yuy2(nb::object native_buffer, int64_t pts_us) {
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!playing_) {
+    if (has_played_ && !playing_) {
       return;
     }
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
@@ -537,7 +537,7 @@ void VideoPlayer::enqueue_video_rgba(
     std::memcpy(frame.y_data.data(), data_ptr, data_size);
 
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!playing_) {
+    if (has_played_ && !playing_) {
       return;
     }
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
@@ -588,7 +588,7 @@ void VideoPlayer::enqueue_video_bgra(
     std::memcpy(frame.y_data.data(), data_ptr, data_size);
 
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!playing_) {
+    if (has_played_ && !playing_) {
       return;
     }
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
@@ -646,7 +646,7 @@ void VideoPlayer::enqueue_audio(nb::ndarray<nb::c_contig, nb::device::cpu> pcm,
   std::memcpy(chunk.data.data(), pcm.data(), pcm.nbytes());
 
   std::lock_guard<std::mutex> lock(mutex_);
-  if (!playing_) {
+  if (has_played_ && !playing_) {
     return;
   }
   audio_queue_.push_back(std::move(chunk));
@@ -665,6 +665,7 @@ void VideoPlayer::process_audio_queue() {
         audio_is_float_ != chunk.is_float) {
       if (audio_stream_) {
         SDL_DestroyAudioStream(audio_stream_);
+        audio_stream_ = nullptr;
       }
 
       SDL_AudioSpec spec = {};
@@ -1037,6 +1038,7 @@ void VideoPlayer::play() {
     fps_calc_start_ns_ = play_start_time_ns_;
   }
 
+  has_played_ = true;
   playing_ = true;
 }
 
@@ -1067,6 +1069,7 @@ void VideoPlayer::stop() {
   dropped_frames_ = 0;
   repeated_frames_ = 0;
   playing_ = false;
+  has_played_ = false;
 
   // 映像のみモードの状態もリセット
   video_start_time_ns_ = 0;
@@ -1134,6 +1137,10 @@ bool VideoPlayer::poll_events() {
   while (SDL_PollEvent(&event)) {
     if (event.type == SDL_EVENT_QUIT) {
       std::lock_guard<std::mutex> lock(mutex_);
+      if (audio_stream_) {
+        SDL_PauseAudioStreamDevice(audio_stream_);
+      }
+      playing_ = false;
       open_ = false;
       return false;
     }
@@ -1143,6 +1150,10 @@ bool VideoPlayer::poll_events() {
         continue;
       }
       std::lock_guard<std::mutex> lock(mutex_);
+      if (audio_stream_) {
+        SDL_PauseAudioStreamDevice(audio_stream_);
+      }
+      playing_ = false;
       open_ = false;
       return false;
     }
