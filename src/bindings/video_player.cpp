@@ -134,8 +134,7 @@ void VideoPlayer::enqueue_video_i420(
 
   // I420 では幅と高さは偶数である必要がある
   if (w % 2 != 0 || h % 2 != 0) {
-    throw std::invalid_argument(
-        "I420 format requires even width and height");
+    throw std::invalid_argument("I420 format requires even width and height");
   }
 
   if (u.ndim() != 2 || u.shape(0) != h / 2 || u.shape(1) != w / 2) {
@@ -202,8 +201,7 @@ void VideoPlayer::enqueue_video_nv12(
 
   // NV12 では幅と高さは偶数である必要がある
   if (w % 2 != 0 || h % 2 != 0) {
-    throw std::invalid_argument(
-        "NV12 format requires even width and height");
+    throw std::invalid_argument("NV12 format requires even width and height");
   }
 
   if (uv.ndim() != 2 || uv.shape(0) != h / 2 || uv.shape(1) != w) {
@@ -280,6 +278,11 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
   // サイズを取得
   int w = static_cast<int>(CVPixelBufferGetWidth(pixel_buffer));
   int h = static_cast<int>(CVPixelBufferGetHeight(pixel_buffer));
+
+  // NV12 では幅と高さは偶数である必要がある
+  if (w % 2 != 0 || h % 2 != 0) {
+    throw std::invalid_argument("NV12 format requires even width and height");
+  }
 
   VideoFrame frame;
   frame.pts_us = pts_us;
@@ -359,6 +362,11 @@ void VideoPlayer::enqueue_video_yuy2(
   int h = static_cast<int>(data.shape(0));
   int w = static_cast<int>(data.shape(1));
 
+  // YUY2 では幅は偶数である必要がある
+  if (w % 2 != 0) {
+    throw std::invalid_argument("YUY2 format requires even width");
+  }
+
   // Python ランタイムからデタッチ前にポインタとサイズを取得
   const uint8_t* data_ptr = data.data();
   size_t data_size = data.nbytes();
@@ -422,6 +430,11 @@ void VideoPlayer::enqueue_video_yuy2(nb::object native_buffer, int64_t pts_us) {
   // サイズを取得
   int w = static_cast<int>(CVPixelBufferGetWidth(pixel_buffer));
   int h = static_cast<int>(CVPixelBufferGetHeight(pixel_buffer));
+
+  // YUY2 では幅は偶数である必要がある
+  if (w % 2 != 0) {
+    throw std::invalid_argument("YUY2 format requires even width");
+  }
 
   VideoFrame frame;
   frame.pts_us = pts_us;
@@ -621,14 +634,16 @@ void VideoPlayer::process_audio_queue() {
     auto& chunk = audio_queue_.front();
 
     // 必要に応じて音声ストリームを作成または再設定
-    if (!audio_stream_ || audio_sample_rate_ != chunk.sample_rate ||
+    // audio_started_ が false の場合も再初期化が必要 (stop 後の再開)
+    if (!audio_stream_ || !audio_started_ ||
+        audio_sample_rate_ != chunk.sample_rate ||
         audio_channels_ != chunk.channels ||
         audio_is_float_ != chunk.is_float) {
       if (audio_stream_) {
         SDL_DestroyAudioStream(audio_stream_);
       }
 
-      SDL_AudioSpec spec;
+      SDL_AudioSpec spec = {};
       spec.format = chunk.is_float ? SDL_AUDIO_F32 : SDL_AUDIO_S16;
       spec.channels = chunk.channels;
       spec.freq = chunk.sample_rate;
@@ -823,7 +838,8 @@ void VideoPlayer::render_stats_overlay() {
     y += char_size + 2;
 
     // 音声 PTS
-    double audio_pts_sec = static_cast<double>(get_audio_clock_us()) / 1000000.0;
+    double audio_pts_sec =
+        static_cast<double>(get_audio_clock_us()) / 1000000.0;
     std::snprintf(buf, sizeof(buf), "Audio PTS: %.3f s", audio_pts_sec);
     SDL_RenderDebugText(renderer_, margin, y, buf);
     y += char_size + 2;
@@ -960,7 +976,7 @@ void VideoPlayer::render_next_frame() {
     }
 
     if (diff > sync_threshold_us_) {
-      // フレームが早い → 待機
+      // フレームが早い → 待機 (次のサイクルで同じフレームを再チェック)
       repeated_frames_++;
       break;
     }
@@ -1071,7 +1087,15 @@ void VideoPlayer::close() {
 }
 
 bool VideoPlayer::poll_events() {
-  SDL_WindowID my_window_id = SDL_GetWindowID(window_);
+  SDL_WindowID my_window_id = 0;
+
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!open_ || !window_) {
+      return false;
+    }
+    my_window_id = SDL_GetWindowID(window_);
+  }
 
   SDL_Event event;
   while (SDL_PollEvent(&event)) {

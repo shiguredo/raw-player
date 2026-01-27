@@ -521,3 +521,20 @@ def test_enqueue_audio_zero_channels():
         player.enqueue_audio(pcm, pts_us=0, sample_rate=sample_rate)
 
     player.close()
+
+
+def test_enqueue_video_yuy2_odd_width():
+    """enqueue_video_yuy2 に奇数幅を渡すとエラーになることを確認"""
+    import raw_player
+
+    player = raw_player.VideoPlayer(320, 240, "Test")
+
+    height = 240
+    width = 321
+
+    yuy2_data = np.zeros((height, width, 2), dtype=np.uint8)
+
+    with pytest.raises(Exception):
+        player.enqueue_video_yuy2(yuy2_data, pts_us=0)
+
+    player.close()

@@ -84,7 +84,8 @@ void AudioPlayer::process_audio_queue() {
     auto& chunk = audio_queue_.front();
 
     // 音声ストリームの作成または再設定が必要かチェック
-    bool need_new_stream = (audio_stream_ == nullptr) ||
+    // audio_started_ が false の場合も再初期化が必要 (stop 後の再開)
+    bool need_new_stream = (audio_stream_ == nullptr) || !audio_started_ ||
                            (chunk.sample_rate != audio_sample_rate_) ||
                            (chunk.channels != audio_channels_) ||
                            (chunk.is_float != audio_is_float_);
@@ -97,7 +98,7 @@ void AudioPlayer::process_audio_queue() {
       }
 
       // 新しいストリームを作成
-      SDL_AudioSpec spec;
+      SDL_AudioSpec spec = {};
       spec.freq = chunk.sample_rate;
       spec.channels = chunk.channels;
       spec.format = chunk.is_float ? SDL_AUDIO_F32 : SDL_AUDIO_S16;
@@ -250,6 +251,9 @@ nb::dict AudioPlayer::stats() const {
   float audio_buffer_ms = 0.0f;
   if (audio_stream_ && audio_sample_rate_ > 0) {
     int queued_bytes = SDL_GetAudioStreamQueued(audio_stream_);
+    if (queued_bytes < 0) {
+      queued_bytes = 0;
+    }
     int sample_size = audio_is_float_ ? 4 : 2;
     int bytes_per_frame = audio_channels_ * sample_size;
     if (bytes_per_frame > 0) {
@@ -278,13 +282,17 @@ nb::dict AudioPlayer::stats() const {
   int64_t total_samples_played = 0;
   if (audio_stream_ && audio_sample_rate_ > 0) {
     int queued_bytes = SDL_GetAudioStreamQueued(audio_stream_);
+    if (queued_bytes < 0) {
+      queued_bytes = 0;
+    }
     int sample_size = audio_is_float_ ? 4 : 2;
     int bytes_per_frame = audio_channels_ * sample_size;
     if (bytes_per_frame > 0) {
       int queued_frames = queued_bytes / bytes_per_frame;
       total_samples_played = audio_samples_written_ - queued_frames;
-      if (total_samples_played < 0)
+      if (total_samples_played < 0) {
         total_samples_played = 0;
+      }
     }
   }
   result["total_samples_played"] = total_samples_played;

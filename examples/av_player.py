@@ -21,9 +21,7 @@ IS_MACOS = sys.platform == "darwin"
 
 def parse_args() -> argparse.Namespace:
     """コマンドライン引数をパースする"""
-    parser = argparse.ArgumentParser(
-        description="カメラ映像とマイク音声を同時に再生するサンプル"
-    )
+    parser = argparse.ArgumentParser(description="カメラ映像とマイク音声を同時に再生するサンプル")
     parser.add_argument(
         "--video-device",
         type=str,
