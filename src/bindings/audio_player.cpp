@@ -115,7 +115,10 @@ void AudioPlayer::process_audio_queue() {
       SDL_SetAudioStreamGain(audio_stream_, volume_);
 
       // 再生を再開
-      SDL_ResumeAudioStreamDevice(audio_stream_);
+      if (!SDL_ResumeAudioStreamDevice(audio_stream_)) {
+        throw std::runtime_error(
+            std::string("Failed to resume audio device: ") + SDL_GetError());
+      }
 
       // 状態を更新
       audio_sample_rate_ = chunk.sample_rate;
@@ -184,7 +187,11 @@ void AudioPlayer::play() {
 
   // ストリームが存在すれば再開
   if (audio_stream_) {
-    SDL_ResumeAudioStreamDevice(audio_stream_);
+    if (!SDL_ResumeAudioStreamDevice(audio_stream_)) {
+      playing_ = false;
+      throw std::runtime_error(std::string("Failed to resume audio device: ") +
+                               SDL_GetError());
+    }
   }
 }
 

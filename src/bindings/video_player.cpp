@@ -1113,6 +1113,16 @@ bool VideoPlayer::poll_events() {
       open_ = false;
       return false;
     }
+    if (event.type == SDL_EVENT_WINDOW_RESIZED ||
+        event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
+      // 自分のウィンドウのイベントのみ処理
+      if (event.window.windowID != my_window_id) {
+        continue;
+      }
+      std::lock_guard<std::mutex> lock(mutex_);
+      window_width_ = event.window.data1;
+      window_height_ = event.window.data2;
+    }
     if (event.type == SDL_EVENT_KEY_DOWN) {
       // 自分のウィンドウのイベントのみ処理
       if (event.key.windowID != my_window_id) {
@@ -1136,6 +1146,8 @@ bool VideoPlayer::poll_events() {
 
       // ロック外でコールバックを実行
       if (callback_copy) {
+        // Python ランタイムにアタッチしてからコールバックを呼び出す
+        nb::gil_scoped_acquire gil;
         bool should_continue = callback_copy(key_code);
         if (!should_continue) {
           std::lock_guard<std::mutex> lock(mutex_);
