@@ -63,7 +63,16 @@ void AudioPlayer::enqueue_audio(nb::ndarray<nb::c_contig, nb::device::cpu> pcm,
   chunk.is_float = is_float;
 
   // データをコピー
-  size_t data_size = frames * channels * sample_size;
+  // pcm.nbytes() を直接使用してオーバーフローを回避
+  size_t data_size = pcm.nbytes();
+  size_t expected_size = static_cast<size_t>(frames) *
+                         static_cast<size_t>(channels) *
+                         static_cast<size_t>(sample_size);
+  if (data_size != expected_size) {
+    throw std::runtime_error("Audio data size mismatch: expected " +
+                             std::to_string(expected_size) + " bytes, got " +
+                             std::to_string(data_size) + " bytes");
+  }
   chunk.data.resize(data_size);
   std::memcpy(chunk.data.data(), pcm.data(), data_size);
 

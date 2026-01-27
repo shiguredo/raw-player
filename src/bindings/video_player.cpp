@@ -1402,6 +1402,8 @@ void init_video_player(nb::module_& m) {
            nb::sig("def enqueue_video_i420(self, y: numpy.ndarray, "
                    "u: numpy.ndarray, v: numpy.ndarray, pts_us: int) -> None"),
            "Enqueue an I420 video frame.\n\n"
+           "Note: Data enqueued while paused (after play() was called) is "
+           "ignored.\n\n"
            "Args:\n"
            "    y: Y plane, uint8 (H, W)\n"
            "    u: U plane, uint8 (H/2, W/2)\n"
@@ -1417,6 +1419,8 @@ void init_video_player(nb::module_& m) {
            nb::sig("def enqueue_video_nv12(self, y: numpy.ndarray, "
                    "uv: numpy.ndarray, pts_us: int) -> None"),
            "Enqueue an NV12 video frame.\n\n"
+           "Note: Data enqueued while paused (after play() was called) is "
+           "ignored.\n\n"
            "Args:\n"
            "    y: Y plane, uint8 (H, W)\n"
            "    uv: UV plane, uint8 (H/2, W)\n"
@@ -1428,6 +1432,8 @@ void init_video_player(nb::module_& m) {
            nb::sig("def enqueue_video_nv12(self, native_buffer: object, "
                    "pts_us: int) -> None"),
            "Enqueue an NV12 video frame from native buffer.\n\n"
+           "Note: Data enqueued while paused (after play() was called) is "
+           "ignored.\n\n"
            "Args:\n"
            "    native_buffer: PyCapsule containing CVPixelBufferRef (macOS)\n"
            "    pts_us: Presentation timestamp in microseconds")
@@ -1440,6 +1446,8 @@ void init_video_player(nb::module_& m) {
            nb::sig("def enqueue_video_yuy2(self, data: numpy.ndarray, "
                    "pts_us: int) -> None"),
            "Enqueue a YUY2 video frame.\n\n"
+           "Note: Data enqueued while paused (after play() was called) is "
+           "ignored.\n\n"
            "Args:\n"
            "    data: Packed YUY2 data, uint8 (H, W, 2)\n"
            "    pts_us: Presentation timestamp in microseconds")
@@ -1450,6 +1458,8 @@ void init_video_player(nb::module_& m) {
            nb::sig("def enqueue_video_yuy2(self, native_buffer: object, "
                    "pts_us: int) -> None"),
            "Enqueue a YUY2 video frame from native buffer.\n\n"
+           "Note: Data enqueued while paused (after play() was called) is "
+           "ignored.\n\n"
            "Args:\n"
            "    native_buffer: PyCapsule containing CVPixelBufferRef (macOS)\n"
            "    pts_us: Presentation timestamp in microseconds")
@@ -1459,6 +1469,8 @@ void init_video_player(nb::module_& m) {
            nb::sig("def enqueue_video_rgba(self, data: numpy.ndarray, "
                    "pts_us: int) -> None"),
            "Enqueue an RGBA video frame.\n\n"
+           "Note: Data enqueued while paused (after play() was called) is "
+           "ignored.\n\n"
            "Args:\n"
            "    data: RGBA data, uint8 (H, W, 4)\n"
            "    pts_us: Presentation timestamp in microseconds")
@@ -1468,6 +1480,8 @@ void init_video_player(nb::module_& m) {
            nb::sig("def enqueue_video_bgra(self, data: numpy.ndarray, "
                    "pts_us: int) -> None"),
            "Enqueue a BGRA video frame.\n\n"
+           "Note: Data enqueued while paused (after play() was called) is "
+           "ignored.\n\n"
            "Args:\n"
            "    data: BGRA data, uint8 (H, W, 4)\n"
            "    pts_us: Presentation timestamp in microseconds")
@@ -1477,6 +1491,8 @@ void init_video_player(nb::module_& m) {
            nb::sig("def enqueue_audio(self, pcm: numpy.ndarray, pts_us: int, "
                    "sample_rate: int) -> None"),
            "Enqueue audio data.\n\n"
+           "Note: Data enqueued while paused (after play() was called) is "
+           "ignored.\n\n"
            "Args:\n"
            "    pcm: Audio samples, int16 or float32, shape (frames,) or "
            "(frames, channels)\n"
