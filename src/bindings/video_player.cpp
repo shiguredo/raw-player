@@ -172,6 +172,9 @@ void VideoPlayer::enqueue_video_i420(
     std::memcpy(frame.v_data.data(), v_ptr, v_size);
 
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!playing_) {
+      return;
+    }
     last_frame_size_bytes_ = static_cast<int64_t>(
         frame.y_data.size() + frame.u_data.size() + frame.v_data.size());
     total_frames_enqueued_++;
@@ -231,6 +234,9 @@ void VideoPlayer::enqueue_video_nv12(
     std::memcpy(frame.u_data.data(), uv_ptr, uv_size);
 
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!playing_) {
+      return;
+    }
     last_frame_size_bytes_ =
         static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
     total_frames_enqueued_++;
@@ -331,6 +337,9 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!playing_) {
+      return;
+    }
     last_frame_size_bytes_ =
         static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
     total_frames_enqueued_++;
@@ -385,6 +394,9 @@ void VideoPlayer::enqueue_video_yuy2(
     std::memcpy(frame.y_data.data(), data_ptr, data_size);
 
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!playing_) {
+      return;
+    }
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
     total_frames_enqueued_++;
 
@@ -469,6 +481,9 @@ void VideoPlayer::enqueue_video_yuy2(nb::object native_buffer, int64_t pts_us) {
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!playing_) {
+      return;
+    }
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
     total_frames_enqueued_++;
 
@@ -522,6 +537,9 @@ void VideoPlayer::enqueue_video_rgba(
     std::memcpy(frame.y_data.data(), data_ptr, data_size);
 
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!playing_) {
+      return;
+    }
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
     total_frames_enqueued_++;
 
@@ -570,6 +588,9 @@ void VideoPlayer::enqueue_video_bgra(
     std::memcpy(frame.y_data.data(), data_ptr, data_size);
 
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!playing_) {
+      return;
+    }
     last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
     total_frames_enqueued_++;
 
@@ -625,6 +646,9 @@ void VideoPlayer::enqueue_audio(nb::ndarray<nb::c_contig, nb::device::cpu> pcm,
   std::memcpy(chunk.data.data(), pcm.data(), pcm.nbytes());
 
   std::lock_guard<std::mutex> lock(mutex_);
+  if (!playing_) {
+    return;
+  }
   audio_queue_.push_back(std::move(chunk));
 }
 
@@ -659,7 +683,10 @@ void VideoPlayer::process_audio_queue() {
       SDL_SetAudioStreamGain(audio_stream_, volume_);
 
       if (playing_) {
-        SDL_ResumeAudioStreamDevice(audio_stream_);
+        if (!SDL_ResumeAudioStreamDevice(audio_stream_)) {
+          throw std::runtime_error(std::string("Failed to resume audio: ") +
+                                   SDL_GetError());
+        }
       }
 
       audio_sample_rate_ = chunk.sample_rate;
@@ -827,6 +854,9 @@ void VideoPlayer::render_stats_overlay() {
     double audio_queue_ms = 0.0;
     if (audio_stream_) {
       int queued_bytes = SDL_GetAudioStreamQueued(audio_stream_);
+      if (queued_bytes < 0) {
+        queued_bytes = 0;
+      }
       int sample_size = (audio_is_float_ ? 4 : 2) * audio_channels_;
       int64_t queued_samples = queued_bytes / sample_size;
       audio_queue_ms = (audio_sample_rate_ > 0)
@@ -996,6 +1026,9 @@ void VideoPlayer::play() {
       throw std::runtime_error(std::string("Failed to resume audio: ") +
                                SDL_GetError());
     }
+  } else {
+    // 映像のみモード: クロックをリセット
+    video_only_started_ = false;
   }
 
   // 再生開始時刻を記録(初回のみ)
@@ -1238,6 +1271,9 @@ nb::dict VideoPlayer::stats() const {
   // 音声キュー(ミリ秒)
   if (audio_stream_) {
     int queued_bytes = SDL_GetAudioStreamQueued(audio_stream_);
+    if (queued_bytes < 0) {
+      queued_bytes = 0;
+    }
     int sample_size = (audio_is_float_ ? 4 : 2) * audio_channels_;
     int64_t queued_samples = queued_bytes / sample_size;
     double audio_queue_ms = (audio_sample_rate_ > 0)

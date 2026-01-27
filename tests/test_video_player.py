@@ -68,6 +68,7 @@ def test_enqueue_video_i420():
     import raw_player
 
     player = raw_player.VideoPlayer(320, 240, "Test")
+    player.play()
 
     height = 240
     width = 320
@@ -90,6 +91,7 @@ def test_enqueue_video_nv12():
     import raw_player
 
     player = raw_player.VideoPlayer(320, 240, "Test")
+    player.play()
 
     height = 240
     width = 320
@@ -111,6 +113,7 @@ def test_enqueue_video_yuy2():
     import raw_player
 
     player = raw_player.VideoPlayer(320, 240, "Test")
+    player.play()
 
     height = 240
     width = 320
@@ -156,6 +159,7 @@ def test_enqueue_video_rgba():
     import raw_player
 
     player = raw_player.VideoPlayer(320, 240, "Test")
+    player.play()
 
     height = 240
     width = 320
@@ -195,6 +199,7 @@ def test_enqueue_video_bgra():
     import raw_player
 
     player = raw_player.VideoPlayer(320, 240, "Test")
+    player.play()
 
     height = 240
     width = 320
@@ -299,6 +304,7 @@ def test_max_video_queue_size_drops_old_frames():
 
     player = raw_player.VideoPlayer(320, 240, "Test")
     player.max_video_queue_size = 3
+    player.play()
 
     height = 240
     width = 320
@@ -324,6 +330,7 @@ def test_max_video_queue_size_zero_disables_limit():
 
     player = raw_player.VideoPlayer(320, 240, "Test")
     player.max_video_queue_size = 0
+    player.play()
 
     height = 240
     width = 320
@@ -348,6 +355,7 @@ def test_drain_video():
     import raw_player
 
     player = raw_player.VideoPlayer(320, 240, "Test")
+    player.play()
 
     height = 240
     width = 320
