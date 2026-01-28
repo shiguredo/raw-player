@@ -1,0 +1,26 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+*.pyi
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Build directories
+_build/
+_deps/
+
+*.mp4
+
+# macos
+.DS_Store
+
+# Clode Clode
+.clode/
+
+# Codex
+.codex/
