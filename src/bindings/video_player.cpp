@@ -655,6 +655,18 @@ void VideoPlayer::render_stats_overlay() {
     return;
   }
 
+  // 全画面に半透明の黒いオーバーレイを描画
+  // スケール変更前に描画するため、レンダラーの出力サイズを取得
+  int output_width = 0;
+  int output_height = 0;
+  SDL_GetRenderOutputSize(renderer_, &output_width, &output_height);
+
+  SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 128);
+  SDL_FRect overlay_rect = {0, 0, static_cast<float>(output_width),
+                            static_cast<float>(output_height)};
+  SDL_RenderFillRect(renderer_, &overlay_rect);
+
   float old_scale_x = 0.0f;
   float old_scale_y = 0.0f;
   SDL_GetRenderScale(renderer_, &old_scale_x, &old_scale_y);
@@ -664,6 +676,7 @@ void VideoPlayer::render_stats_overlay() {
 
   const int char_size = SDL_DEBUG_TEXT_FONT_CHARACTER_SIZE;
   const float margin = 5.0f;
+
   float y = margin;
 
   SDL_SetRenderDrawColor(renderer_, 0, 255, 0, 255);
