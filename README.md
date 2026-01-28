@@ -18,10 +18,6 @@ Please read <https://github.com/shiguredo/oss/blob/master/README.en.md> before u
 
 ## raw-player について
 
-> [!WARNING]
-> raw-player は破壊的変更を伴う可能性のある開発段階のソフトウェアです。
-> そのため、 API は予告なく変更される可能性があります。
-
 [numpy.ndarray](https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html) 形式で渡された生の映像・音声データを再生する Python ライブラリです。
 
 PCM / I420 / NV12 / YUY2 / RGBA / BGRA データを PTS (Presentation Timestamp) に基づいて音声と映像を同期しながら再生します。
