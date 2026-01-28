@@ -222,5 +222,8 @@ class VideoPlayer {
   void render_next_frame();            // 次のフレームをレンダリング
   void render_stats_overlay();         // stats オーバーレイを描画
   void enqueue_frame_internal(VideoFrame&& frame);  // フレームをキューに追加
-  float render_stat_line(float y, float margin, int char_size, const char* text);
+  float render_stat_line(float y,
+                         float margin,
+                         int char_size,
+                         const char* text);
 };

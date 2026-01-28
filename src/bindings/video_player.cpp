@@ -100,8 +100,8 @@ VideoPlayer::~VideoPlayer() {
 
 void VideoPlayer::enqueue_frame_internal(VideoFrame&& frame) {
   // フレームサイズを計算
-  int64_t frame_size_bytes =
-      static_cast<int64_t>(frame.y_data.size() + frame.u_data.size() + frame.v_data.size());
+  int64_t frame_size_bytes = static_cast<int64_t>(
+      frame.y_data.size() + frame.u_data.size() + frame.v_data.size());
 
   std::lock_guard<std::mutex> lock(mutex_);
   if (has_played_ && !playing_) {
