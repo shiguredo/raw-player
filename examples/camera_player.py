@@ -77,6 +77,13 @@ def main():
         help="ビットレート (kbps)。デフォルト: 8000",
     )
     parser.add_argument(
+        "--capture-format",
+        type=str,
+        default="NV12",
+        choices=["NV12", "YUY2"],
+        help="キャプチャフォーマット。デフォルト: NV12",
+    )
+    parser.add_argument(
         "--flip-horizontal",
         action="store_true",
         help="映像を左右反転(ミラー)",
@@ -95,6 +102,14 @@ def main():
 
     # コーデック使用の有無
     use_codec = args.video_codec_type is not None
+
+    # キャプチャフォーマット
+    capture_format = uvc.Format.NV12 if args.capture_format == "NV12" else uvc.Format.YUY2
+
+    # YUY2 とコーデックは併用不可 (webcodecs-py が YUY2 をサポートしていないため)
+    if args.capture_format == "YUY2" and use_codec:
+        print("エラー: YUY2 キャプチャフォーマットはコーデック使用時には対応していません")
+        return
 
     # native_buffer と flip は併用不可
     if args.native_buffer and (args.flip_horizontal or args.flip_vertical):
@@ -129,11 +144,12 @@ def main():
     print(f"GPU Driver: {get_gpu_driver()}")
     print(f"Resolution: {width}x{height}")
     print(f"FPS: {fps}")
+    print(f"Capture Format: {args.capture_format}")
     if use_codec:
         print(f"Codec: {args.video_codec_type} ({codec_string})")
         print(f"Bitrate: {args.video_bitrate} kbps")
     else:
-        print("Codec: None (生データ NV12)")
+        print(f"Codec: None (生データ {args.capture_format})")
     if args.native_buffer:
         print("Native Buffer: 有効")
     print(f"Duration: {args.duration}s ({total_frames} frames)")
@@ -154,7 +170,7 @@ def main():
         return
 
     # キャプチャ開始
-    device.start(width, height, fps, capture_format=uvc.Format.NV12)
+    device.start(width, height, fps, capture_format=capture_format)
 
     # 実際の解像度を取得
     print(f"カメラ解像度: {width}x{height}")
@@ -349,85 +365,109 @@ def main():
                 else:
                     # 生データモード: native_buffer を直接 enqueue
                     enqueue_start = time.perf_counter()
-                    player.enqueue_video_nv12(native_buf, timestamp_us)
+                    if args.capture_format == "NV12":
+                        player.enqueue_video_nv12(native_buf, timestamp_us)
+                    else:
+                        player.enqueue_video_yuy2(native_buf, timestamp_us)
                     rendered_frames += 1
                     enqueue_time = time.perf_counter() - enqueue_start
                     enqueue_times.append(enqueue_time)
             else:
                 # numpy 配列モード
-                y_plane, uv_plane = uvc_frame.to_nv12()
+                if args.capture_format == "NV12":
+                    y_plane, uv_plane = uvc_frame.to_nv12()
 
-                # 反転処理
-                if args.flip_horizontal and args.flip_vertical:
-                    y_plane = np.flip(y_plane, axis=(0, 1)).copy()
-                    uv_plane = np.flip(uv_plane, axis=(0, 1)).copy()
-                elif args.flip_horizontal:
-                    y_plane = np.flip(y_plane, axis=1).copy()
-                    uv_plane = np.flip(uv_plane, axis=1).copy()
-                elif args.flip_vertical:
-                    y_plane = np.flip(y_plane, axis=0).copy()
-                    uv_plane = np.flip(uv_plane, axis=0).copy()
+                    # 反転処理
+                    if args.flip_horizontal and args.flip_vertical:
+                        y_plane = np.flip(y_plane, axis=(0, 1)).copy()
+                        uv_plane = np.flip(uv_plane, axis=(0, 1)).copy()
+                    elif args.flip_horizontal:
+                        y_plane = np.flip(y_plane, axis=1).copy()
+                        uv_plane = np.flip(uv_plane, axis=1).copy()
+                    elif args.flip_vertical:
+                        y_plane = np.flip(y_plane, axis=0).copy()
+                        uv_plane = np.flip(uv_plane, axis=0).copy()
 
-                raw_frame_sizes.append(y_plane.nbytes + uv_plane.nbytes)
+                    raw_frame_sizes.append(y_plane.nbytes + uv_plane.nbytes)
 
-                if use_codec:
-                    # VideoFrame を作成(エンコード用、NV12)
-                    video_frame = VideoFrame(
-                        y_plane,
-                        uv_plane,
-                        {
-                            "format": VideoPixelFormat.NV12,
-                            "coded_width": width,
-                            "coded_height": height,
-                            "timestamp": timestamp_us,
-                        },
-                    )
+                    if use_codec:
+                        # VideoFrame を作成(エンコード用、NV12)
+                        video_frame = VideoFrame(
+                            y_plane,
+                            uv_plane,
+                            {
+                                "format": VideoPixelFormat.NV12,
+                                "coded_width": width,
+                                "coded_height": height,
+                                "timestamp": timestamp_us,
+                            },
+                        )
 
-                    # エンコード
-                    encode_start = time.perf_counter()
-                    is_key_frame = frame_number % (fps * 2) == 0
-                    assert encoder is not None
-                    encoder.encode(video_frame, {"key_frame": is_key_frame})
-                    video_frame.close()
-                    encode_time = time.perf_counter() - encode_start
-                    encode_times.append(encode_time)
+                        # エンコード
+                        encode_start = time.perf_counter()
+                        is_key_frame = frame_number % (fps * 2) == 0
+                        assert encoder is not None
+                        encoder.encode(video_frame, {"key_frame": is_key_frame})
+                        video_frame.close()
+                        encode_time = time.perf_counter() - encode_start
+                        encode_times.append(encode_time)
 
-                    # エンコードされたチャンクをデコード
-                    decode_start = time.perf_counter()
-                    assert decoder is not None
-                    while encoded_chunks:
-                        chunk = encoded_chunks.popleft()
-                        encoded_frame_sizes.append(chunk.byte_length)
-                        if decoder_configured:
-                            decoder.decode(chunk)
-                    decode_time = time.perf_counter() - decode_start
-                    decode_times.append(decode_time)
+                        # エンコードされたチャンクをデコード
+                        decode_start = time.perf_counter()
+                        assert decoder is not None
+                        while encoded_chunks:
+                            chunk = encoded_chunks.popleft()
+                            encoded_frame_sizes.append(chunk.byte_length)
+                            if decoder_configured:
+                                decoder.decode(chunk)
+                        decode_time = time.perf_counter() - decode_start
+                        decode_times.append(decode_time)
 
-                    # デコードされたフレームを enqueue
-                    enqueue_start = time.perf_counter()
-                    while decoded_frames:
-                        decoded_frame = decoded_frames.popleft()
-                        if decoded_frame.format == VideoPixelFormat.NV12:
-                            y_data = decoded_frame.plane(0)
-                            uv_data = decoded_frame.plane(1)
-                            decoded_frame_sizes.append(y_data.nbytes + uv_data.nbytes)
-                            pts_us = decoded_frame.timestamp
-                            player.enqueue_video_nv12(y_data, uv_data, pts_us)
-                        else:
-                            y_data, u_data, v_data = decoded_frame.planes()
-                            decoded_frame_sizes.append(
-                                y_data.nbytes + u_data.nbytes + v_data.nbytes
-                            )
-                            pts_us = decoded_frame.timestamp
-                            player.enqueue_video_i420(y_data, u_data, v_data, pts_us)
-                        decoded_frame.close()
+                        # デコードされたフレームを enqueue
+                        enqueue_start = time.perf_counter()
+                        while decoded_frames:
+                            decoded_frame = decoded_frames.popleft()
+                            if decoded_frame.format == VideoPixelFormat.NV12:
+                                y_data = decoded_frame.plane(0)
+                                uv_data = decoded_frame.plane(1)
+                                decoded_frame_sizes.append(y_data.nbytes + uv_data.nbytes)
+                                pts_us = decoded_frame.timestamp
+                                player.enqueue_video_nv12(y_data, uv_data, pts_us)
+                            else:
+                                y_data, u_data, v_data = decoded_frame.planes()
+                                decoded_frame_sizes.append(
+                                    y_data.nbytes + u_data.nbytes + v_data.nbytes
+                                )
+                                pts_us = decoded_frame.timestamp
+                                player.enqueue_video_i420(y_data, u_data, v_data, pts_us)
+                            decoded_frame.close()
+                            rendered_frames += 1
+                        enqueue_time = time.perf_counter() - enqueue_start
+                        enqueue_times.append(enqueue_time)
+                    else:
+                        # 生データモード: 直接 enqueue
+                        enqueue_start = time.perf_counter()
+                        player.enqueue_video_nv12(y_plane, uv_plane, timestamp_us)
                         rendered_frames += 1
-                    enqueue_time = time.perf_counter() - enqueue_start
-                    enqueue_times.append(enqueue_time)
+                        enqueue_time = time.perf_counter() - enqueue_start
+                        enqueue_times.append(enqueue_time)
                 else:
+                    # YUY2 モード (コーデック非使用のみ)
+                    yuy2_data = uvc_frame.to_yuy2()
+
+                    # 反転処理
+                    if args.flip_horizontal and args.flip_vertical:
+                        yuy2_data = np.flip(yuy2_data, axis=(0, 1)).copy()
+                    elif args.flip_horizontal:
+                        yuy2_data = np.flip(yuy2_data, axis=1).copy()
+                    elif args.flip_vertical:
+                        yuy2_data = np.flip(yuy2_data, axis=0).copy()
+
+                    raw_frame_sizes.append(yuy2_data.nbytes)
+
                     # 生データモード: 直接 enqueue
                     enqueue_start = time.perf_counter()
-                    player.enqueue_video_nv12(y_plane, uv_plane, timestamp_us)
+                    player.enqueue_video_yuy2(yuy2_data, timestamp_us)
                     rendered_frames += 1
                     enqueue_time = time.perf_counter() - enqueue_start
                     enqueue_times.append(enqueue_time)
@@ -522,7 +562,7 @@ def main():
         print()
         if raw_frame_sizes:
             avg_raw = sum(raw_frame_sizes) / len(raw_frame_sizes)
-            print(f"平均生データサイズ (NV12): {avg_raw / 1024:.2f} KB")
+            print(f"平均生データサイズ ({args.capture_format}): {avg_raw / 1024:.2f} KB")
         if encoded_frame_sizes:
             avg_encoded = sum(encoded_frame_sizes) / len(encoded_frame_sizes)
             print(f"平均エンコード後サイズ ({args.video_codec_type}): {avg_encoded / 1024:.2f} KB")
