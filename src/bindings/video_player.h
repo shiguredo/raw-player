@@ -221,4 +221,6 @@ class VideoPlayer {
   int64_t get_audio_clock_us() const;  // 音声クロックを取得
   void render_next_frame();            // 次のフレームをレンダリング
   void render_stats_overlay();         // stats オーバーレイを描画
+  void enqueue_frame_internal(VideoFrame&& frame);  // フレームをキューに追加
+  float render_stat_line(float y, float margin, int char_size, const char* text);
 };

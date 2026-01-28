@@ -28,6 +28,28 @@ class CVPixelBufferLockGuard {
  private:
   CVPixelBufferRef buffer_;
 };
+
+// PyCapsule から CVPixelBufferRef を抽出して検証するヘルパー関数
+static CVPixelBufferRef extract_cv_pixel_buffer(nb::object native_buffer) {
+  if (!nb::isinstance<nb::capsule>(native_buffer)) {
+    throw std::invalid_argument(
+        "native_buffer must be a PyCapsule containing CVPixelBufferRef");
+  }
+
+  nb::capsule capsule = nb::cast<nb::capsule>(native_buffer);
+  const char* name = capsule.name();
+  if (name == nullptr || std::strcmp(name, "CVPixelBufferRef") != 0) {
+    throw std::invalid_argument(
+        "native_buffer must be a PyCapsule with name 'CVPixelBufferRef'");
+  }
+
+  CVPixelBufferRef pixel_buffer = static_cast<CVPixelBufferRef>(capsule.data());
+  if (pixel_buffer == nullptr) {
+    throw std::invalid_argument("native_buffer contains null pointer");
+  }
+
+  return pixel_buffer;
+}
 #endif
 
 VideoPlayer::VideoPlayer(int width, int height, const std::string& title)
@@ -74,6 +96,29 @@ VideoPlayer::VideoPlayer(int width, int height, const std::string& title)
 
 VideoPlayer::~VideoPlayer() {
   close();
+}
+
+void VideoPlayer::enqueue_frame_internal(VideoFrame&& frame) {
+  // フレームサイズを計算
+  int64_t frame_size_bytes =
+      static_cast<int64_t>(frame.y_data.size() + frame.u_data.size() + frame.v_data.size());
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (has_played_ && !playing_) {
+    return;
+  }
+  last_frame_size_bytes_ = frame_size_bytes;
+  total_frames_enqueued_++;
+
+  // キューサイズ制限を適用
+  if (max_video_queue_size_ > 0) {
+    while (video_queue_.size() >= max_video_queue_size_) {
+      video_queue_.pop_front();
+      dropped_frames_++;
+    }
+  }
+
+  video_queue_.push_back(std::move(frame));
 }
 
 void VideoPlayer::create_texture(int width, int height, VideoFormat format) {
@@ -171,23 +216,7 @@ void VideoPlayer::enqueue_video_i420(
     frame.v_data.resize(v_size);
     std::memcpy(frame.v_data.data(), v_ptr, v_size);
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (has_played_ && !playing_) {
-      return;
-    }
-    last_frame_size_bytes_ = static_cast<int64_t>(
-        frame.y_data.size() + frame.u_data.size() + frame.v_data.size());
-    total_frames_enqueued_++;
-
-    // キューサイズ制限を適用
-    if (max_video_queue_size_ > 0) {
-      while (video_queue_.size() >= max_video_queue_size_) {
-        video_queue_.pop_front();
-        dropped_frames_++;
-      }
-    }
-
-    video_queue_.push_back(std::move(frame));
+    enqueue_frame_internal(std::move(frame));
   }
 }
 
@@ -233,45 +262,13 @@ void VideoPlayer::enqueue_video_nv12(
     frame.u_data.resize(uv_size);
     std::memcpy(frame.u_data.data(), uv_ptr, uv_size);
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (has_played_ && !playing_) {
-      return;
-    }
-    last_frame_size_bytes_ =
-        static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
-    total_frames_enqueued_++;
-
-    // キューサイズ制限を適用
-    if (max_video_queue_size_ > 0) {
-      while (video_queue_.size() >= max_video_queue_size_) {
-        video_queue_.pop_front();
-        dropped_frames_++;
-      }
-    }
-
-    video_queue_.push_back(std::move(frame));
+    enqueue_frame_internal(std::move(frame));
   }
 }
 
 void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
 #ifdef __APPLE__
-  // PyCapsule から CVPixelBufferRef を取得
-  if (!nb::isinstance<nb::capsule>(native_buffer)) {
-    throw std::invalid_argument(
-        "native_buffer must be a PyCapsule containing CVPixelBufferRef");
-  }
-
-  nb::capsule capsule = nb::cast<nb::capsule>(native_buffer);
-  const char* name = capsule.name();
-  if (name == nullptr || std::strcmp(name, "CVPixelBufferRef") != 0) {
-    throw std::invalid_argument(
-        "native_buffer must be a PyCapsule with name 'CVPixelBufferRef'");
-  }
-
-  CVPixelBufferRef pixel_buffer = static_cast<CVPixelBufferRef>(capsule.data());
-  if (pixel_buffer == nullptr) {
-    throw std::invalid_argument("native_buffer contains null pointer");
-  }
+  CVPixelBufferRef pixel_buffer = extract_cv_pixel_buffer(native_buffer);
 
   // ピクセルフォーマットを確認
   OSType pixel_format = CVPixelBufferGetPixelFormatType(pixel_buffer);
@@ -336,23 +333,7 @@ void VideoPlayer::enqueue_video_nv12(nb::object native_buffer, int64_t pts_us) {
       }
     }
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (has_played_ && !playing_) {
-      return;
-    }
-    last_frame_size_bytes_ =
-        static_cast<int64_t>(frame.y_data.size() + frame.u_data.size());
-    total_frames_enqueued_++;
-
-    // キューサイズ制限を適用
-    if (max_video_queue_size_ > 0) {
-      while (video_queue_.size() >= max_video_queue_size_) {
-        video_queue_.pop_front();
-        dropped_frames_++;
-      }
-    }
-
-    video_queue_.push_back(std::move(frame));
+    enqueue_frame_internal(std::move(frame));
   }
 #else
   (void)native_buffer;
@@ -393,44 +374,13 @@ void VideoPlayer::enqueue_video_yuy2(
     frame.y_data.resize(data_size);
     std::memcpy(frame.y_data.data(), data_ptr, data_size);
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (has_played_ && !playing_) {
-      return;
-    }
-    last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
-    total_frames_enqueued_++;
-
-    // キューサイズ制限を適用
-    if (max_video_queue_size_ > 0) {
-      while (video_queue_.size() >= max_video_queue_size_) {
-        video_queue_.pop_front();
-        dropped_frames_++;
-      }
-    }
-
-    video_queue_.push_back(std::move(frame));
+    enqueue_frame_internal(std::move(frame));
   }
 }
 
 void VideoPlayer::enqueue_video_yuy2(nb::object native_buffer, int64_t pts_us) {
 #ifdef __APPLE__
-  // PyCapsule から CVPixelBufferRef を取得
-  if (!nb::isinstance<nb::capsule>(native_buffer)) {
-    throw std::invalid_argument(
-        "native_buffer must be a PyCapsule containing CVPixelBufferRef");
-  }
-
-  nb::capsule capsule = nb::cast<nb::capsule>(native_buffer);
-  const char* name = capsule.name();
-  if (name == nullptr || std::strcmp(name, "CVPixelBufferRef") != 0) {
-    throw std::invalid_argument(
-        "native_buffer must be a PyCapsule with name 'CVPixelBufferRef'");
-  }
-
-  CVPixelBufferRef pixel_buffer = static_cast<CVPixelBufferRef>(capsule.data());
-  if (pixel_buffer == nullptr) {
-    throw std::invalid_argument("native_buffer contains null pointer");
-  }
+  CVPixelBufferRef pixel_buffer = extract_cv_pixel_buffer(native_buffer);
 
   // ピクセルフォーマットを確認
   OSType pixel_format = CVPixelBufferGetPixelFormatType(pixel_buffer);
@@ -480,22 +430,7 @@ void VideoPlayer::enqueue_video_yuy2(nb::object native_buffer, int64_t pts_us) {
       }
     }
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (has_played_ && !playing_) {
-      return;
-    }
-    last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
-    total_frames_enqueued_++;
-
-    // キューサイズ制限を適用
-    if (max_video_queue_size_ > 0) {
-      while (video_queue_.size() >= max_video_queue_size_) {
-        video_queue_.pop_front();
-        dropped_frames_++;
-      }
-    }
-
-    video_queue_.push_back(std::move(frame));
+    enqueue_frame_internal(std::move(frame));
   }
 #else
   (void)native_buffer;
@@ -536,22 +471,7 @@ void VideoPlayer::enqueue_video_rgba(
     frame.y_data.resize(data_size);
     std::memcpy(frame.y_data.data(), data_ptr, data_size);
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (has_played_ && !playing_) {
-      return;
-    }
-    last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
-    total_frames_enqueued_++;
-
-    // キューサイズ制限を適用
-    if (max_video_queue_size_ > 0) {
-      while (video_queue_.size() >= max_video_queue_size_) {
-        video_queue_.pop_front();
-        dropped_frames_++;
-      }
-    }
-
-    video_queue_.push_back(std::move(frame));
+    enqueue_frame_internal(std::move(frame));
   }
 }
 
@@ -587,22 +507,7 @@ void VideoPlayer::enqueue_video_bgra(
     frame.y_data.resize(data_size);
     std::memcpy(frame.y_data.data(), data_ptr, data_size);
 
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (has_played_ && !playing_) {
-      return;
-    }
-    last_frame_size_bytes_ = static_cast<int64_t>(frame.y_data.size());
-    total_frames_enqueued_++;
-
-    // キューサイズ制限を適用
-    if (max_video_queue_size_ > 0) {
-      while (video_queue_.size() >= max_video_queue_size_) {
-        video_queue_.pop_front();
-        dropped_frames_++;
-      }
-    }
-
-    video_queue_.push_back(std::move(frame));
+    enqueue_frame_internal(std::move(frame));
   }
 }
 
@@ -737,6 +642,14 @@ int64_t VideoPlayer::get_audio_clock_us() const {
   return first_audio_pts_us_ + played_us;
 }
 
+float VideoPlayer::render_stat_line(float y,
+                                    float margin,
+                                    int char_size,
+                                    const char* text) {
+  SDL_RenderDebugText(renderer_, margin, y, text);
+  return y + char_size + 2;
+}
+
 void VideoPlayer::render_stats_overlay() {
   if (!show_stats_overlay_ || !renderer_) {
     return;
@@ -758,11 +671,10 @@ void VideoPlayer::render_stats_overlay() {
   char buf[128];
 
   // レンダラー名
-  const char* renderer_name = SDL_GetRendererName(renderer_);
+  const char* sdl_renderer_name = SDL_GetRendererName(renderer_);
   std::snprintf(buf, sizeof(buf), "Renderer: %s",
-                renderer_name ? renderer_name : "unknown");
-  SDL_RenderDebugText(renderer_, margin, y, buf);
-  y += char_size + 2;
+                sdl_renderer_name ? sdl_renderer_name : "unknown");
+  y = render_stat_line(y, margin, char_size, buf);
 
   // フォーマット
   const char* format_name = "unknown";
@@ -785,8 +697,7 @@ void VideoPlayer::render_stats_overlay() {
   }
   std::snprintf(buf, sizeof(buf), "Format: %s %dx%d", format_name,
                 texture_width_, texture_height_);
-  SDL_RenderDebugText(renderer_, margin, y, buf);
-  y += char_size + 2;
+  y = render_stat_line(y, margin, char_size, buf);
 
   // FPS とビットレート
   double bitrate_mbps = 0.0;
@@ -796,8 +707,7 @@ void VideoPlayer::render_stats_overlay() {
   }
   std::snprintf(buf, sizeof(buf), "FPS: %.1f (%.1f Mbps)", current_fps_,
                 bitrate_mbps);
-  SDL_RenderDebugText(renderer_, margin, y, buf);
-  y += char_size + 2;
+  y = render_stat_line(y, margin, char_size, buf);
 
   // 経過時間
   double elapsed_sec = 0.0;
@@ -810,21 +720,18 @@ void VideoPlayer::render_stats_overlay() {
   int elapsed_sec_part = static_cast<int>(elapsed_sec) % 60;
   std::snprintf(buf, sizeof(buf), "Elapsed: %d:%02d", elapsed_min,
                 elapsed_sec_part);
-  SDL_RenderDebugText(renderer_, margin, y, buf);
-  y += char_size + 2;
+  y = render_stat_line(y, margin, char_size, buf);
 
   // フレーム統計
   std::snprintf(buf, sizeof(buf), "Frames: %lld enqueued / %lld rendered",
                 static_cast<long long>(total_frames_enqueued_),
                 static_cast<long long>(total_frames_rendered_));
-  SDL_RenderDebugText(renderer_, margin, y, buf);
-  y += char_size + 2;
+  y = render_stat_line(y, margin, char_size, buf);
 
   // ドロップ/リピート/キュー
   std::snprintf(buf, sizeof(buf), "Drop: %d Repeat: %d Queue: %zu",
                 dropped_frames_, repeated_frames_, video_queue_.size());
-  SDL_RenderDebugText(renderer_, margin, y, buf);
-  y += char_size + 2;
+  y = render_stat_line(y, margin, char_size, buf);
 
   // 映像バッファ時間
   double video_buffer_ms = 0.0;
@@ -834,22 +741,19 @@ void VideoPlayer::render_stats_overlay() {
     video_buffer_ms = static_cast<double>(last_pts - first_pts) / 1000.0;
   }
   std::snprintf(buf, sizeof(buf), "Video Buffer: %.1f ms", video_buffer_ms);
-  SDL_RenderDebugText(renderer_, margin, y, buf);
-  y += char_size + 2;
+  y = render_stat_line(y, margin, char_size, buf);
 
   // 映像 PTS
   double video_pts_sec = static_cast<double>(last_video_pts_us_) / 1000000.0;
   std::snprintf(buf, sizeof(buf), "Video PTS: %.3f s", video_pts_sec);
-  SDL_RenderDebugText(renderer_, margin, y, buf);
-  y += char_size + 2;
+  y = render_stat_line(y, margin, char_size, buf);
 
   // 音声情報
   if (audio_started_) {
     // 音声フォーマット
     std::snprintf(buf, sizeof(buf), "Audio: %d Hz %dch %s", audio_sample_rate_,
                   audio_channels_, audio_is_float_ ? "float32" : "int16");
-    SDL_RenderDebugText(renderer_, margin, y, buf);
-    y += char_size + 2;
+    y = render_stat_line(y, margin, char_size, buf);
 
     // 音声バッファ
     double audio_queue_ms = 0.0;
@@ -865,22 +769,19 @@ void VideoPlayer::render_stats_overlay() {
                            : 0.0;
     }
     std::snprintf(buf, sizeof(buf), "Audio Buffer: %.1f ms", audio_queue_ms);
-    SDL_RenderDebugText(renderer_, margin, y, buf);
-    y += char_size + 2;
+    y = render_stat_line(y, margin, char_size, buf);
 
     // 音声 PTS
     double audio_pts_sec =
         static_cast<double>(get_audio_clock_us()) / 1000000.0;
     std::snprintf(buf, sizeof(buf), "Audio PTS: %.3f s", audio_pts_sec);
-    SDL_RenderDebugText(renderer_, margin, y, buf);
-    y += char_size + 2;
+    y = render_stat_line(y, margin, char_size, buf);
 
     // AV 同期差
     int64_t sync_diff_ms = (get_audio_clock_us() - last_video_pts_us_) / 1000;
     std::snprintf(buf, sizeof(buf), "AV Sync: %+lld ms",
                   static_cast<long long>(sync_diff_ms));
-    SDL_RenderDebugText(renderer_, margin, y, buf);
-    y += char_size + 2;
+    y = render_stat_line(y, margin, char_size, buf);
   }
 
   SDL_SetRenderScale(renderer_, old_scale_x, old_scale_y);
