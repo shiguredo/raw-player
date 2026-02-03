@@ -11,6 +11,9 @@
 
 ## develop
 
+- [UPDATE] nanobind の最小バージョンを 2.11.0 にする
+  - @voluntas
+
 ### misc
 
 ## 2026.1.0
