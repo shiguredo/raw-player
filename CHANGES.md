@@ -11,7 +11,9 @@
 
 ## develop
 
-- [UPDATE] nanobind の最小バージョンを 2.11.0 にする
+- [UPDATE] SDL のバージョンを 3.4.2 に上げる
+  - @voluntas
+- [UPDATE] nanobind の最小バージョンを 2.12.0 に上げる
   - @voluntas
 
 ### misc
